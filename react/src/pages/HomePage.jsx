@@ -69,7 +69,7 @@ function HomePage() {
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       {/* Hero block */}
-      <div className="home-hero full-bleed">
+      <section className="home-hero">
         <div className="home-hero__bg" />
         <div className="home-hero__pattern" />
         <div className="home-hero__orbs">
@@ -79,7 +79,7 @@ function HomePage() {
         </div>
         <div className="container">
           <div className="home-hero__content">
-            <div style={{ maxWidth: 880, margin: '0 auto' }}>
+            <div className="container--narrow">
               <Title level={1} style={{ marginBottom: 8, marginTop: 0, lineHeight: 1.15 }}>
                 Пишите и читайте комментарии к объявлениям Avito
               </Title>
@@ -111,7 +111,7 @@ function HomePage() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Popular listings */}
       <Card title="Самые просматриваемые" className="card-shadow">
