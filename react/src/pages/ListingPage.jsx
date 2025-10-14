@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Button, Card, Comment as AntComment, Empty, Form, Input, List, Result, Space, Spin, Tag, Typography, message } from 'antd';
+import { Avatar, Button, Card, Empty, Form, Input, List, Result, Space, Spin, Tag, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getListingById } from '../api/listings';
 import { createComment, getComments } from '../api/comments';
@@ -139,13 +139,20 @@ function ListingPage() {
             itemLayout="horizontal"
             dataSource={comments}
             renderItem={(item) => (
-              <li>
-                <AntComment
-                  author={<span>{item.authorName || 'Аноним'}</span>}
-                  content={<span>{item.text}</span>}
-                  datetime={<span>{new Date(item.createdAt).toLocaleString('ru-RU')}</span>}
+              <List.Item>
+                <List.Item.Meta
+                  avatar={<Avatar>{(item.authorName || 'А')[0].toUpperCase()}</Avatar>}
+                  title={
+                    <span>
+                      {item.authorName || 'Аноним'}
+                      <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
+                        {new Date(item.createdAt).toLocaleString('ru-RU')}
+                      </Typography.Text>
+                    </span>
+                  }
+                  description={<Typography.Text>{item.text}</Typography.Text>}
                 />
-              </li>
+              </List.Item>
             )}
           />
         ) : (
