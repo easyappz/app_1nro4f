@@ -78,6 +78,53 @@
   bottom: -80px;
   right: -120px;
 }
+/* Subtle dotted pattern overlay */
+.home-hero__pattern {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.35) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.25;
+  mix-blend-mode: overlay;
+}
+/* Animated glow orbs */
+.home-hero__orbs {
+  position: absolute;
+  inset: -10% -10%;
+  pointer-events: none;
+}
+.home-hero__orbs .orb {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.25;
+  animation: float 18s ease-in-out infinite;
+}
+.home-hero__orbs .orb.orb--1 {
+  top: -6%;
+  left: -8%;
+  background: radial-gradient(circle at 30% 30%, rgba(106, 93, 246, 0.55), transparent 60%);
+  animation-delay: 0s;
+}
+.home-hero__orbs .orb.orb--2 {
+  bottom: -8%;
+  right: -6%;
+  background: radial-gradient(circle at 70% 50%, rgba(0, 180, 216, 0.45), transparent 60%);
+  animation-delay: -6s;
+}
+.home-hero__orbs .orb.orb--3 {
+  top: 20%;
+  right: 30%;
+  background: radial-gradient(circle at 50% 50%, rgba(126, 231, 135, 0.40), transparent 60%);
+  animation-delay: -12s;
+}
+@keyframes float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(6px, -12px, 0) scale(1.02); }
+}
 .home-hero__content {
   position: relative;
   width: 100%;

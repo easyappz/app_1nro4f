@@ -69,8 +69,14 @@ function HomePage() {
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       {/* Hero block */}
-      <div className="home-hero">
+      <div className="home-hero full-bleed">
         <div className="home-hero__bg" />
+        <div className="home-hero__pattern" />
+        <div className="home-hero__orbs">
+          <span className="orb orb--1" />
+          <span className="orb orb--2" />
+          <span className="orb orb--3" />
+        </div>
         <div className="container">
           <div className="home-hero__content">
             <div style={{ maxWidth: 880, margin: '0 auto' }}>

@@ -56,3 +56,16 @@ code {
 
 /* Comments list small helpers */
 .comment-like { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Full-bleed utility for sections that must span viewport width */
+.full-bleed {
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  width: 100vw;
+}
+
+/* Fine-tune hero to overlap app-content top padding */
+.home-hero.full-bleed { margin-top: -28px; }
