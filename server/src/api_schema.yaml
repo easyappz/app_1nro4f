@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Listings and Comments API
-  version: 1.2.1
+  version: 1.3.0
   description: API for resolving Avito listings, deduplicating by avitoId, tracking popularity, and managing comments with likes.
 servers:
   - url: /api
@@ -76,7 +76,7 @@ paths:
               example:
                 data:
                   _id: 6710b8f2f1a5b0a9f3e1c123
-                  url: https://www.avito.ru/moskva/bytovaya_elektronика/iphone_14_pro_256gb_123456789
+                  url: https://www.avito.ru/moskva/bytovaya_elektrоника/iphone_14_pro_256gb_123456789
                   canonicalUrl: https://www.avito.ru/moskva/iphone_14_pro_256gb_123456789
                   avitoId: '123456789'
                   mainImageUrl: https://example.cdn.avito.ru/images/123456789.jpg
@@ -312,6 +312,9 @@ paths:
                   details: Stack or message
     post:
       summary: Create a comment for a listing
+      description: |
+        The server deterministically generates authorName from the provided nameKey using a stable algorithm.
+        Backward compatibility: if legacy authorName is provided without nameKey, it will be used. If nameKey is present, authorName from the client is ignored.
       parameters:
         - in: path
           name: id
@@ -325,14 +328,22 @@ paths:
           application/json:
             schema:
               type: object
-              required: [authorName, text]
+              required: [nameKey, text]
               properties:
+                nameKey:
+                  type: string
+                  description: Ключ клиента для детерминированной генерации имени на сервере, стабильный в пределах сессии.
+                  example: session-abc-123
                 authorName:
                   type: string
-                  example: John Doe
+                  deprecated: true
+                  description: DEPRECATED. Ignored when nameKey is present. Kept only for backward compatibility with older clients.
                 text:
                   type: string
                   example: Please contact me
+            example:
+              nameKey: session-abc-123
+              text: Please contact me
       responses:
         '201':
           description: Comment created
@@ -347,7 +358,7 @@ paths:
                 data:
                   _id: 6710bd33f1a5b0a9f3e1c950
                   listingId: 6710bb00f1a5b0a9f3e1c800
-                  authorName: John Doe
+                  authorName: Яркий Сокол
                   text: Please contact me
                   likesCount: 0
                   createdAt: 2025-10-14T13:20:00.000Z
@@ -356,12 +367,12 @@ paths:
           content:
             application/json:
               examples:
-                missingAuthor:
-                  summary: Missing authorName
+                missingNameKey:
+                  summary: Missing nameKey (and no legacy authorName)
                   value:
                     error:
-                      message: Field "authorName" is required
-                      details: Empty authorName
+                      message: Field "nameKey" is required
+                      details: Missing nameKey
                 missingText:
                   summary: Missing text
                   value:

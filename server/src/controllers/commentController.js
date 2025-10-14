@@ -3,6 +3,7 @@
 const mongoose = require('mongoose');
 const Comment = require('@src/models/Comment');
 const Listing = require('@src/models/Listing');
+const { displayNameFromKey } = require('@src/utils/namegen');
 
 function normalizeComment(doc) {
   if (!doc) return doc;
@@ -57,19 +58,26 @@ const commentController = {
         return res.status(404).json({ error: { message: 'Listing not found' } });
       }
 
-      const { authorName, text } = req.body || {};
-      const name = typeof authorName === 'string' ? authorName.trim() : '';
+      const { nameKey, text, authorName } = req.body || {};
+      const key = typeof nameKey === 'string' ? nameKey.trim() : '';
       const body = typeof text === 'string' ? text.trim() : '';
-
-      if (!name) {
-        return res.status(400).json({ error: { message: 'Field "authorName" is required' } });
-      }
+      const legacyName = typeof authorName === 'string' ? authorName.trim() : '';
 
       if (!body) {
-        return res.status(400).json({ error: { message: 'Field "text" is required' } });
+        return res.status(400).json({ error: { message: 'Field "text" is required', details: 'Empty text' } });
       }
 
-      const created = await Comment.create({ listingId: listing._id, authorName: name, text: body });
+      let finalName = '';
+      if (key) {
+        finalName = displayNameFromKey(key);
+      } else if (legacyName) {
+        // Backward compatibility for older clients
+        finalName = legacyName;
+      } else {
+        return res.status(400).json({ error: { message: 'Field "nameKey" is required', details: 'Missing "nameKey" and legacy "authorName"' } });
+      }
+
+      const created = await Comment.create({ listingId: listing._id, authorName: finalName, text: body });
       return res.status(201).json({ data: normalizeComment(created) });
     } catch (error) {
       return res.status(500).json({ error: { message: error.message, details: error.message } });
