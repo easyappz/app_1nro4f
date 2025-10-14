@@ -1,12 +1,17 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Empty, Form, Input, List, Space, Spin, Typography, message } from 'antd';
-import { EyeOutlined, PictureOutlined } from '@ant-design/icons';
+import { Form, message } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { resolveListing, getPopular } from '../api/listings';
 
-const { Title, Paragraph, Text } = Typography;
+import Hero from '../components/landing/Hero';
+import Steps from '../components/landing/Steps';
+import Benefits from '../components/landing/Benefits';
+import Popular from '../components/landing/Popular';
+import Testimonials from '../components/landing/Testimonials';
+import FAQ from '../components/landing/FAQ';
+import CTA from '../components/landing/CTA';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -50,133 +55,34 @@ function HomePage() {
     navigate(`/listing/${id}`);
   };
 
-  const renderCover = (imgUrl, titleText) => {
-    if (imgUrl) {
-      return (
-        <div className="media-16x9">
-          <img className="media-img" src={imgUrl} alt={titleText || 'Объявление Avito'} />
-        </div>
-      );
-    }
-    return (
-      <div className="media-16x9">
-        <div className="image-placeholder">
-          <PictureOutlined />
-        </div>
-      </div>
-    );
-  };
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://example.com/';
 
   return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
+    <div style={{ width: '100%' }}>
       <Helmet>
         <title>Авиатор — комментарии к объявлениям Avito</title>
         <meta name="description" content="Вставьте ссылку на объявление Avito, читайте и оставляйте комментарии. Популярные карточки — ниже." />
+        <meta property="og:title" content="Авиатор — комментарии к объявлениям Avito" />
+        <meta property="og:description" content="Обсуждайте объявления Avito, читайте мнения и делитесь опытом. Популярные карточки — на главной." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={currentUrl} />
       </Helmet>
 
-      {/* Hero block */}
-      <section className="home-hero">
-        <div className="home-hero__bg" />
-        <div className="home-hero__pattern" />
-        <div className="home-hero__orbs">
-          <span className="orb orb--1" />
-          <span className="orb orb--2" />
-          <span className="orb orb--3" />
-        </div>
-        <div className="container">
-          <div className="home-hero__content">
-            <div className="container--narrow">
-              <Title level={1} style={{ marginBottom: 8, marginTop: 0, lineHeight: 1.15 }}>
-                Пишите и читайте комментарии к объявлениям Avito
-              </Title>
-              <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 20 }}>
-                Вставьте ссылку на объявление, чтобы перейти к обсуждению.
-              </Paragraph>
-              <div className="glass card-shadow search-card">
-                <Form
-                  form={form}
-                  layout="inline"
-                  size="large"
-                  onFinish={onFinish}
-                  style={{ rowGap: 12 }}
-                >
-                  <Form.Item
-                    name="url"
-                    rules={[{ required: true, message: 'Пожалуйста, вставьте ссылку' }]}
-                    style={{ flex: 1, minWidth: 280 }}
-                  >
-                    <Input
-                      placeholder="https://www.avito.ru/..."
-                      allowClear
-                      disabled={isResolving}
-                      aria-label="Поле для ссылки на объявление Avito"
-                    />
-                  </Form.Item>
-                  <Form.Item>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      loading={isResolving}
-                      size="large"
-                      aria-label="Найти по ссылке"
-                    >
-                      Найти по ссылке
-                    </Button>
-                  </Form.Item>
-                </Form>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Popular listings */}
-      <Card title="Самые просматриваемые" className="card-shadow">
-        {isPopularLoading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
-            <Spin />
-          </div>
-        ) : isPopularError ? (
-          <Empty description={popularError?.response?.data?.error?.message || 'Не удалось загрузить популярные объявления'}>
-            <Button onClick={() => refetchPopular()}>Повторить</Button>
-          </Empty>
-        ) : popular.length === 0 ? (
-          <Empty description="Пока нет данных" />
-        ) : (
-          <List
-            grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 3, xl: 4 }}
-            dataSource={popular}
-            renderItem={(item) => {
-              const titleText = item?.title || 'Без названия';
-              const views = item?.viewsCount ?? 0;
-              return (
-                <List.Item>
-                  <Card
-                    hoverable
-                    className="card-shadow"
-                    cover={renderCover(item?.mainImageUrl, titleText)}
-                    onClick={() => handleCardClick(item._id)}
-                  >
-                    <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                      <Text style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>
-                        {titleText}
-                      </Text>
-                      <Space size={6} align="center">
-                        <EyeOutlined style={{ color: 'var(--text-600)' }} />
-                        <Text type="secondary">Просмотры: {views}</Text>
-                      </Space>
-                      <Button type="link" onClick={(e) => { e.stopPropagation(); handleCardClick(item._id); }}>
-                        Открыть карточку
-                      </Button>
-                    </Space>
-                  </Card>
-                </List.Item>
-              );
-            }}
-          />
-        )}
-      </Card>
-    </Space>
+      <Hero form={form} isResolving={isResolving} onFinish={onFinish} />
+      <Steps />
+      <Benefits />
+      <Popular
+        isLoading={isPopularLoading}
+        isError={isPopularError}
+        error={popularError}
+        data={popular}
+        onRetry={refetchPopular}
+        onCardClick={handleCardClick}
+      />
+      <Testimonials />
+      <FAQ />
+      <CTA />
+    </div>
   );
 }
 

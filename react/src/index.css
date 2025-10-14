@@ -57,6 +57,7 @@ code {
 
 /* Page sections */
 .section { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+.section--spacious { padding: 32px 0; }
 
 /* Title spacing tweaks */
 .h-space { height: 16px; }

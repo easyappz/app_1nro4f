@@ -49,6 +49,7 @@
   display: flex;
   align-items: center;
   overflow: hidden;
+  margin-top: -28px;
 }
 .home-hero__bg {
   position: absolute;
@@ -148,3 +149,36 @@
   max-width: 760px;
   margin: 0 auto;
 }
+
+/* Sections */
+.section-title { margin: 0 0 4px; }
+.section-subtitle { margin: 0 0 20px; color: var(--text-600); }
+.section--spacious { padding: 32px 0; }
+
+/* Step card */
+.step-card { text-align: left; }
+.step-card__icon { font-size: 28px; color: var(--brand-start); display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 10px; background: rgba(106,93,246,0.12); margin-bottom: 12px; }
+
+/* Benefit card */
+.benefit-card { text-align: left; }
+.benefit-card__icon { font-size: 28px; color: var(--brand-end); display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 10px; background: rgba(0,180,216,0.12); margin-bottom: 12px; }
+
+/* Hover lift */
+.hover-lift { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(17,24,39,0.10); }
+
+/* Testimonials */
+.testimonial-card { max-width: 920px; margin: 0 auto; }
+.testimonial-carousel .slick-dots li button { background: rgba(15,23,42,0.25); }
+.testimonial-carousel .slick-dots li.slick-active button { background: var(--brand-start); }
+
+/* FAQ */
+.faq-collapse .ant-collapse-item { background: #fff; border-radius: var(--radius); margin-bottom: 8px; border: 1px solid #f0f0f0; overflow: hidden; }
+
+/* CTA */
+.cta-section {
+  padding: 48px 0 64px;
+  background: radial-gradient(800px 320px at 10% 10%, rgba(106,93,246,0.15), transparent 60%),
+              radial-gradient(800px 320px at 90% 0%, rgba(0,180,216,0.15), transparent 60%);
+}
+.cta-card { text-align: center; padding: 28px; }
