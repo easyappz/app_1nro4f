@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Col, Empty, Form, Input, List, Row, Space, Spin, Typography, message } from 'antd';
+import { Button, Card, Empty, Form, Input, List, Space, Spin, Typography, message } from 'antd';
+import { EyeOutlined, PictureOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { resolveListing, getPopular } from '../api/listings';
 
@@ -48,9 +49,26 @@ function HomePage() {
     navigate(`/listing/${id}`);
   };
 
+  const renderCover = (imgUrl, titleText) => {
+    if (imgUrl) {
+      return (
+        <div className="media-16x9">
+          <img className="media-img" src={imgUrl} alt={titleText || 'Объявление Avito'} />
+        </div>
+      );
+    }
+    return (
+      <div className="media-16x9">
+        <div className="image-placeholder">
+          <PictureOutlined />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <Card>
+      <Card className="card-shadow">
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Title level={3} style={{ margin: 0 }}>Найти объявление по ссылке Avito</Title>
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
@@ -78,7 +96,7 @@ function HomePage() {
         </Space>
       </Card>
 
-      <Card title="Самые просматриваемые">
+      <Card title="Самые просматриваемые" className="card-shadow">
         {isPopularLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
             <Spin />
@@ -93,27 +111,33 @@ function HomePage() {
           <List
             grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 3, xl: 4 }}
             dataSource={popular}
-            renderItem={(item) => (
-              <List.Item>
-                <Card
-                  hoverable
-                  onClick={() => handleCardClick(item._id)}
-                  title={
-                    <Text style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {item.title || 'Без названия'}
-                    </Text>
-                  }
-                  extra={<Text type="secondary">Просмотры: {item.viewsCount ?? 0}</Text>}
-                >
-                  <Space direction="vertical" size={8}>
-                    <Text type="secondary" style={{ wordBreak: 'break-all' }}>{item.url}</Text>
-                    <Button type="link" onClick={(e) => { e.stopPropagation(); handleCardClick(item._id); }}>
-                      Открыть карточку
-                    </Button>
-                  </Space>
-                </Card>
-              </List.Item>
-            )}
+            renderItem={(item) => {
+              const titleText = item?.title || 'Без названия';
+              const views = item?.viewsCount ?? 0;
+              return (
+                <List.Item>
+                  <Card
+                    hoverable
+                    className="card-shadow"
+                    cover={renderCover(item?.mainImageUrl, titleText)}
+                    onClick={() => handleCardClick(item._id)}
+                  >
+                    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                      <Text style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>
+                        {titleText}
+                      </Text>
+                      <Space size={6} align="center">
+                        <EyeOutlined style={{ color: 'var(--text-600)' }} />
+                        <Text type="secondary">Просмотры: {views}</Text>
+                      </Space>
+                      <Button type="link" onClick={(e) => { e.stopPropagation(); handleCardClick(item._id); }}>
+                        Открыть карточку
+                      </Button>
+                    </Space>
+                  </Card>
+                </List.Item>
+              );
+            }}
           />
         )}
       </Card>

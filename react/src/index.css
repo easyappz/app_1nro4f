@@ -1,5 +1,24 @@
+:root {
+  --brand-start: #6a5df6;
+  --brand-end: #00b4d8;
+  --accent: #10b981;
+  --bg-100: #f5f7fb;
+  --bg-200: #eef2f7;
+  --text-900: #0f172a;
+  --text-600: #475569;
+  --card-bg: #ffffff;
+  --shadow: 0 6px 18px rgba(17, 24, 39, 0.06);
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
 body {
   margin: 0;
+  color: var(--text-900);
+  background: var(--bg-100);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
@@ -8,6 +27,29 @@ body {
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
+
+.container {
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.app-content { padding: 28px 0 40px; }
+.app-footer { text-align: center; background: transparent; color: var(--text-600); }
+
+/* Media wrapper 16:9 */
+.media-16x9 { position: relative; width: 100%; padding-top: 56.25%; overflow: hidden; border-radius: var(--radius); background: var(--bg-200); }
+.media-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.card-shadow { border-radius: var(--radius) !important; box-shadow: var(--shadow); overflow: hidden; }
+
+/* Placeholder for missing images */
+.image-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 42px; background: linear-gradient(135deg, var(--brand-start), var(--brand-end)); }
+
+/* Page sections */
+.section { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+
+/* Title spacing tweaks */
+.h-space { height: 16px; }

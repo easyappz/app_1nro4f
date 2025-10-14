@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Avatar, Button, Card, Empty, Form, Input, List, Result, Space, Spin, Tag, Typography, message } from 'antd';
+import { EyeOutlined, LinkOutlined, PictureOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Helmet } from 'react-helmet-async';
 import { getListingById } from '../api/listings';
 import { createComment, getComments } from '../api/comments';
 
@@ -11,9 +13,6 @@ function ListingPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
-  const iframeRef = useRef(null);
-  const [showIframe, setShowIframe] = useState(true);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   const {
     data: listing,
@@ -39,15 +38,6 @@ function ListingPage() {
     enabled: !!id,
   });
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!iframeLoaded) {
-        setShowIframe(false);
-      }
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [iframeLoaded]);
-
   const { mutate: sendComment, isPending: isSending } = useMutation({
     mutationFn: (payload) => createComment(id, payload),
     onSuccess: () => {
@@ -71,9 +61,27 @@ function ListingPage() {
     sendComment(values);
   };
 
+  const renderHero = () => {
+    const imgUrl = listing?.mainImageUrl;
+    if (imgUrl) {
+      return (
+        <div className="media-16x9">
+          <img className="media-img" src={imgUrl} alt={listing?.title || 'Объявление Avito'} />
+        </div>
+      );
+    }
+    return (
+      <div className="media-16x9">
+        <div className="image-placeholder">
+          <PictureOutlined />
+        </div>
+      </div>
+    );
+  };
+
   if (isListingLoading) {
     return (
-      <Card>
+      <Card className="card-shadow">
         <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
           <Spin />
         </div>
@@ -92,40 +100,34 @@ function ListingPage() {
     );
   }
 
+  const titleText = listing?.title || 'Без названия';
+  const views = listing?.viewsCount ?? 0;
+  const avitoId = listing?.avitoId;
+
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <Card>
-        {showIframe ? (
-          <iframe
-            ref={iframeRef}
-            title="Avito Listing"
-            src={listing.url}
-            style={{ width: '100%', height: 500, border: '1px solid #f0f0f0', borderRadius: 8 }}
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-            onLoad={() => setIframeLoaded(true)}
-            onError={() => setShowIframe(false)}
-          />
-        ) : (
-          <Result
-            status="info"
-            title="Предпросмотр недоступен"
-            subTitle="Сайт может запрещать встраивание в iframe. Откройте объявление на Avito."
-            extra={<Button type="primary" onClick={handleOpenOriginal}>Открыть на Avito</Button>}
-          />
-        )}
+      <Helmet>
+        <title>Авиатор — {titleText}</title>
+      </Helmet>
+
+      <Card className="hero-card">
+        {renderHero()}
       </Card>
 
-      <Card>
+      <Card className="card-shadow">
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Title level={3} style={{ margin: 0 }}>{listing.title || 'Без названия'}</Title>
-          <Space align="center" size={12}>
-            <Tag color="blue">Просмотры: {listing.viewsCount ?? 0}</Tag>
-            <Button onClick={handleOpenOriginal}>Открыть на Avito</Button>
+          <Title level={2} style={{ margin: 0 }}>{titleText}</Title>
+          <Space align="center" size={12} wrap>
+            <Tag color="blue"><EyeOutlined /> <span style={{ marginLeft: 6 }}>Просмотры: {views}</span></Tag>
+            {avitoId ? <Tag color="green">ID Avito: {avitoId}</Tag> : null}
+            <Button type="primary" icon={<LinkOutlined />} onClick={handleOpenOriginal}>
+              Открыть на Avito
+            </Button>
           </Space>
         </Space>
       </Card>
 
-      <Card title="Комментарии">
+      <Card title="Комментарии" className="card-shadow">
         {isCommentsLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
             <Spin />
@@ -159,7 +161,7 @@ function ListingPage() {
           <Empty description="Пока нет комментариев" />
         ))}
 
-        <div style={{ height: 16 }} />
+        <div className="h-space" />
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item

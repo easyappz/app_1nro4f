@@ -3,7 +3,9 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { ConfigProvider, Layout, theme } from 'antd';
 import ruRU from 'antd/locale/ru_RU';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import 'antd/dist/reset.css';
+import './App.css';
 
 import ErrorBoundary from './ErrorBoundary';
 import HomePage from './pages/HomePage.jsx';
@@ -18,26 +20,31 @@ function App() {
     <ErrorBoundary>
       <ConfigProvider locale={ruRU} theme={{ algorithm: theme.defaultAlgorithm }}>
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-              <Header style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Link to="/" style={{ color: '#fff', fontWeight: 700, fontSize: 18, textDecoration: 'none' }}>
-                    Easyappz · Avito Объявления
-                  </Link>
-                </div>
-              </Header>
-              <Content style={{ padding: '24px', maxWidth: 1100, margin: '0 auto', width: '100%' }}>
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/listing/:id" element={<ListingPage />} />
-                </Routes>
-              </Content>
-              <Footer style={{ textAlign: 'center' }}>
-                © {new Date().getFullYear()} Easyappz. Все права защищены.
-              </Footer>
-            </Layout>
-          </BrowserRouter>
+          <HelmetProvider>
+            <BrowserRouter>
+              <Helmet>
+                <title>Авиатор</title>
+              </Helmet>
+              <Layout style={{ minHeight: '100vh', background: 'var(--bg-100)' }}>
+                <Header className="app-header">
+                  <div className="container">
+                    <Link to="/" className="brand">Easyappz · Авиатор</Link>
+                  </div>
+                </Header>
+                <Content className="app-content">
+                  <div className="container">
+                    <Routes>
+                      <Route path="/" element={<HomePage />} />
+                      <Route path="/listing/:id" element={<ListingPage />} />
+                    </Routes>
+                  </div>
+                </Content>
+                <Footer className="app-footer">
+                  © {new Date().getFullYear()} Easyappz. Все права защищены.
+                </Footer>
+              </Layout>
+            </BrowserRouter>
+          </HelmetProvider>
         </QueryClientProvider>
       </ConfigProvider>
     </ErrorBoundary>
