@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Card, Empty, Form, Input, List, Space, Spin, Typography, message } from 'antd';
 import { EyeOutlined, PictureOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Helmet } from 'react-helmet-async';
 import { resolveListing, getPopular } from '../api/listings';
 
 const { Title, Paragraph, Text } = Typography;
@@ -68,6 +69,11 @@ function HomePage() {
 
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
+      <Helmet>
+        <title>Авиатор — комментарии к объявлениям Avito</title>
+        <meta name="description" content="Вставьте ссылку на объявление Avito, читайте и оставляйте комментарии. Популярные карточки — ниже." />
+      </Helmet>
+
       {/* Hero block */}
       <section className="home-hero">
         <div className="home-hero__bg" />
@@ -99,10 +105,21 @@ function HomePage() {
                     rules={[{ required: true, message: 'Пожалуйста, вставьте ссылку' }]}
                     style={{ flex: 1, minWidth: 280 }}
                   >
-                    <Input placeholder="https://www.avito.ru/..." allowClear disabled={isResolving} />
+                    <Input
+                      placeholder="https://www.avito.ru/..."
+                      allowClear
+                      disabled={isResolving}
+                      aria-label="Поле для ссылки на объявление Avito"
+                    />
                   </Form.Item>
                   <Form.Item>
-                    <Button type="primary" htmlType="submit" loading={isResolving} size="large">
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={isResolving}
+                      size="large"
+                      aria-label="Найти по ссылке"
+                    >
                       Найти по ссылке
                     </Button>
                   </Form.Item>

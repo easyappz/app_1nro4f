@@ -5,7 +5,7 @@ import { EyeOutlined, LinkOutlined, PictureOutlined, HeartOutlined } from '@ant-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { getListingById } from '../api/listings';
-import { createComment, getComments, likeComment, getPopularComments, unlikeComment } from '../api/comments';
+import { createComment, getComments, likeComment, getPopularComments } from '../api/comments';
 
 const { Title, Text } = Typography;
 
@@ -149,7 +149,7 @@ function ListingPage() {
           <Space align="center" size={12} wrap>
             <Tag color="blue"><EyeOutlined /> <span style={{ marginLeft: 6 }}>Просмотры: {views}</span></Tag>
             {avitoId ? <Tag color="green">ID Avito: {avitoId}</Tag> : null}
-            <Button type="primary" icon={<LinkOutlined />} onClick={handleOpenOriginal}>
+            <Button type="primary" icon={<LinkOutlined />} onClick={handleOpenOriginal} aria-label="Открыть объявление на Avito">
               Открыть на Avito
             </Button>
           </Space>
@@ -168,6 +168,7 @@ function ListingPage() {
         ) : (Array.isArray(mergedComments) && mergedComments.length > 0 ? (
           <List
             itemLayout="horizontal"
+            split={false}
             dataSource={mergedComments}
             renderItem={(item) => (
               <List.Item style={{ width: '100%' }}>
