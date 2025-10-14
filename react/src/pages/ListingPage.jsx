@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { getListingById } from '../api/listings';
 import { createComment, getComments, likeComment, getPopularComments } from '../api/comments';
+import getOrCreateNameKey from '../api/nameKey';
 
 const { Title, Text } = Typography;
 
@@ -87,7 +88,9 @@ function ListingPage() {
   };
 
   const onFinish = (values) => {
-    sendComment(values);
+    const nameKey = getOrCreateNameKey();
+    const text = typeof values.text === 'string' ? values.text.trim() : '';
+    sendComment({ nameKey, text });
   };
 
   const renderHero = () => {
@@ -206,19 +209,24 @@ function ListingPage() {
         <div className="h-space" />
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Form.Item
-            label="Ваше имя"
-            name="authorName"
-            rules={[{ required: true, message: 'Введите имя' }]}
-          >
-            <Input placeholder="Например, Иван" disabled={isSending} />
-          </Form.Item>
+          <Text type="secondary" style={{ marginBottom: 8, display: 'block' }}>
+            Ваше имя создаётся автоматически
+          </Text>
           <Form.Item
             label="Комментарий"
             name="text"
-            rules={[{ required: true, message: 'Введите текст комментария' }]}
+            rules={[
+              { required: true, message: 'Введите текст комментария' },
+              {
+                validator: (_, value) => {
+                  const v = typeof value === 'string' ? value.trim() : '';
+                  if (!v) return Promise.reject(new Error('Введите текст комментария'));
+                  return Promise.resolve();
+                },
+              },
+            ]}
           >
-            <Input.TextArea placeholder="Ваше мнение..." autoSize={{ minRows: 3, maxRows: 6 }} disabled={isSending} />
+            <Input.TextArea placeholder="Напишите комментарий..." autoSize={{ minRows: 3, maxRows: 6 }} disabled={isSending} />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={isSending}>
