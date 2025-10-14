@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Listings and Comments API
-  version: 1.0.0
-  description: API for resolving Avito listings, tracking popularity, and managing comments.
+  version: 1.1.0
+  description: API for resolving Avito listings, deduplicating by avitoId, tracking popularity, and managing comments.
 servers:
   - url: /api
 paths:
@@ -46,7 +46,11 @@ paths:
                   details: Failed to handle /status
   /listings/resolve:
     post:
-      summary: Resolve listing by Avito URL (find or create with fetched title)
+      summary: Resolve listing by Avito URL, normalize and deduplicate by avitoId
+      description: |
+        Accepts an original Avito URL, fetches details (title, mainImageUrl, canonicalUrl),
+        determines avitoId, and either links to an existing listing or creates a new one.
+        Returns Listing with avitoId and mainImageUrl so the client can display the main image.
       requestBody:
         required: true
         content:
@@ -60,7 +64,7 @@ paths:
                   example: https://www.avito.ru/moskva/bytovaya_elektronika/iphone_14_pro_256gb_123456789
       responses:
         '200':
-          description: Listing already exists
+          description: Listing already exists (found by avitoId or legacy URL)
           content:
             application/json:
               schema:
@@ -72,6 +76,9 @@ paths:
                 data:
                   _id: 6710b8f2f1a5b0a9f3e1c123
                   url: https://www.avito.ru/moskva/bytovaya_elektronika/iphone_14_pro_256gb_123456789
+                  canonicalUrl: https://www.avito.ru/moskva/iphone_14_pro_256gb_123456789
+                  avitoId: '123456789'
+                  mainImageUrl: https://example.cdn.avito.ru/images/123456789.jpg
                   title: iPhone 14 Pro 256GB
                   viewsCount: 12
                   createdAt: 2025-10-14T12:00:00.000Z
@@ -88,7 +95,10 @@ paths:
               example:
                 data:
                   _id: 6710b900f1a5b0a9f3e1c456
-                  url: https://www.avito.ru/moskva/bytovaya_elektronika/iphone_14_pro_256gb_987654321
+                  url: https://www.avito.ru/moskva/iphone_14_pro_256gb_987654321
+                  canonicalUrl: https://www.avito.ru/moskva/iphone_14_pro_256gb_987654321
+                  avitoId: '987654321'
+                  mainImageUrl: https://example.cdn.avito.ru/images/987654321.jpg
                   title: iPhone 14 Pro 256GB (New)
                   viewsCount: 0
                   createdAt: 2025-10-14T12:35:00.000Z
@@ -100,13 +110,28 @@ paths:
               example:
                 error:
                   message: Invalid URL: not-a-valid-url
-        '500':
-          description: Server error while creating
+        '422':
+          description: Could not determine avitoId from the provided URL/page
           content:
             application/json:
               example:
                 error:
-                  message: Failed to create listing
+                  message: Unable to resolve avitoId from page content or URL
+        '500':
+          description: Server error while resolving/creating
+          content:
+            application/json:
+              examples:
+                createFailed:
+                  summary: Creation failed
+                  value:
+                    error:
+                      message: Failed to create listing
+                resolveFailed:
+                  summary: Resolve failed
+                  value:
+                    error:
+                      message: Failed to fetch Avito details: Network timeout
   /listings/popular:
     get:
       summary: Get popular listings ordered by viewsCount desc
@@ -139,12 +164,18 @@ paths:
                 data:
                   - _id: 6710ba2bf1a5b0a9f3e1c789
                     url: https://www.avito.ru/item/1
+                    canonicalUrl: https://www.avito.ru/item/1
+                    avitoId: '111111111'
+                    mainImageUrl: https://example.cdn.avito.ru/images/111111111.jpg
                     title: First listing
                     viewsCount: 120
                     createdAt: 2025-10-10T10:00:00.000Z
                     updatedAt: 2025-10-12T10:00:00.000Z
                   - _id: 6710ba3af1a5b0a9f3e1c790
                     url: https://www.avito.ru/item/2
+                    canonicalUrl: https://www.avito.ru/item/2
+                    avitoId: '222222222'
+                    mainImageUrl: https://example.cdn.avito.ru/images/222222222.jpg
                     title: Second listing
                     viewsCount: 90
                     createdAt: 2025-10-09T09:00:00.000Z
@@ -182,6 +213,9 @@ paths:
                 data:
                   _id: 6710bb00f1a5b0a9f3e1c800
                   url: https://www.avito.ru/item/3
+                  canonicalUrl: https://www.avito.ru/item/3
+                  avitoId: '333333333'
+                  mainImageUrl: https://example.cdn.avito.ru/images/333333333.jpg
                   title: Third listing
                   viewsCount: 51
                   createdAt: 2025-10-08T08:00:00.000Z
@@ -341,6 +375,14 @@ components:
           description: Mongo ObjectId
         url:
           type: string
+        canonicalUrl:
+          type: string
+        avitoId:
+          type: string
+          description: Unique Avito listing id
+        mainImageUrl:
+          type: string
+          description: Main image URL (from og:image)
         title:
           type: string
         viewsCount:

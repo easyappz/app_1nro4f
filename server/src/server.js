@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const apiRoutes = require('@src/routes/main');
+const Listing = require('@src/models/Listing');
 
 const app = express();
 
@@ -55,6 +56,14 @@ app.use((err, req, res, next) => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('MongoDB connected');
+
+    // Sync indexes for Listing to drop old unique index on url and create unique sparse on avitoId
+    try {
+      await Listing.syncIndexes();
+      console.log('Listing indexes synchronized');
+    } catch (syncErr) {
+      console.error('Failed to sync Listing indexes:', syncErr.message);
+    }
   } catch (error) {
     console.error('MongoDB connection error:', error.message);
   }

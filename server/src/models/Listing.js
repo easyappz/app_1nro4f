@@ -4,11 +4,17 @@ const mongoose = require('mongoose');
 
 const ListingSchema = new mongoose.Schema(
   {
-    url: { type: String, required: true, unique: true, trim: true },
-    title: { type: String, default: '' },
+    url: { type: String, required: true, trim: true },
+    canonicalUrl: { type: String, default: '', trim: true },
+    avitoId: { type: String, index: true, unique: true, sparse: true, trim: true },
+    mainImageUrl: { type: String, default: '', trim: true },
+    title: { type: String, default: '', trim: true },
     viewsCount: { type: Number, default: 0, min: 0 }
   },
   { timestamps: true }
 );
+
+// Ensure unique sparse index on avitoId
+ListingSchema.index({ avitoId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.models.Listing || mongoose.model('Listing', ListingSchema);

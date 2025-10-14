@@ -2,7 +2,7 @@
 
 const mongoose = require('mongoose');
 const Listing = require('@src/models/Listing');
-const { fetchAvitoTitle } = require('@src/utils/avito');
+const { fetchAvitoDetails } = require('@src/utils/avito');
 
 const listingController = {
   async resolveListing(req, res) {
@@ -20,34 +20,86 @@ const listingController = {
         // eslint-disable-next-line no-new
         new URL(rawUrl);
       } catch (e) {
-        return res.status(400).json({ error: { message: `Invalid URL: ${rawUrl}` } });
+        return res.status(400).json({ error: { message: `Invalid URL: ${rawUrl}`, details: e.message } });
       }
 
-      const existing = await Listing.findOne({ url: rawUrl });
-      if (existing) {
-        return res.status(200).json({ data: existing });
-      }
-
-      let title = '';
+      let details;
       try {
-        title = await fetchAvitoTitle(rawUrl);
+        details = await fetchAvitoDetails(rawUrl);
       } catch (e) {
-        // Non-fatal, we still create the listing with empty title
-        title = '';
+        // If we cannot resolve avitoId specifically, return 422; otherwise 500
+        const msg = e && e.message ? e.message : 'Failed to resolve listing';
+        const isAvitoIdError = msg.includes('Unable to resolve avitoId');
+        return res.status(isAvitoIdError ? 422 : 500).json({ error: { message: msg } });
       }
 
+      const { avitoId, title, mainImageUrl, canonicalUrl } = details;
+      const normalizedUrl = (canonicalUrl && canonicalUrl.trim()) || rawUrl;
+
       try {
-        const created = await Listing.create({ url: rawUrl, title });
-        return res.status(201).json({ data: created });
-      } catch (err) {
-        if (err && err.code === 11000) {
-          // Race condition: listing was created meanwhile
-          const doc = await Listing.findOne({ url: rawUrl });
-          if (doc) {
+        // 1) Try to find by avitoId
+        let doc = await Listing.findOne({ avitoId });
+        if (doc) {
+          const updates = {};
+          if (isNonEmptyString(title) && title !== doc.title) updates.title = title;
+          if (isNonEmptyString(mainImageUrl) && mainImageUrl !== doc.mainImageUrl) updates.mainImageUrl = mainImageUrl;
+          if (isNonEmptyString(canonicalUrl) && canonicalUrl !== doc.canonicalUrl) updates.canonicalUrl = canonicalUrl;
+          if (isNonEmptyString(normalizedUrl) && normalizedUrl !== doc.url) updates.url = normalizedUrl;
+
+          if (Object.keys(updates).length > 0) {
+            doc.set(updates);
+            await doc.save();
+          }
+          return res.status(200).json({ data: doc });
+        }
+
+        // 2) Backward compatibility: find by URL (raw or canonical)
+        doc = await Listing.findOne({ $or: [{ url: rawUrl }, { url: normalizedUrl }] });
+        if (doc) {
+          try {
+            doc.set({
+              avitoId,
+              title: isNonEmptyString(title) ? title : doc.title,
+              mainImageUrl: isNonEmptyString(mainImageUrl) ? mainImageUrl : doc.mainImageUrl,
+              canonicalUrl: isNonEmptyString(canonicalUrl) ? canonicalUrl : doc.canonicalUrl,
+              url: isNonEmptyString(normalizedUrl) ? normalizedUrl : doc.url
+            });
+            await doc.save();
             return res.status(200).json({ data: doc });
+          } catch (err) {
+            if (err && err.code === 11000) {
+              // Race: duplicate avitoId just created elsewhere
+              const conflict = await Listing.findOne({ avitoId });
+              if (conflict) {
+                return res.status(200).json({ data: conflict });
+              }
+            }
+            return res.status(500).json({ error: { message: 'Failed to update existing listing', details: err.message } });
           }
         }
-        return res.status(500).json({ error: { message: err.message || 'Failed to create listing' } });
+
+        // 3) Create new
+        try {
+          const created = await Listing.create({
+            url: normalizedUrl,
+            canonicalUrl: isNonEmptyString(canonicalUrl) ? canonicalUrl : '',
+            avitoId,
+            mainImageUrl: isNonEmptyString(mainImageUrl) ? mainImageUrl : '',
+            title: isNonEmptyString(title) ? title : ''
+          });
+          return res.status(201).json({ data: created });
+        } catch (err) {
+          if (err && err.code === 11000) {
+            // Race: someone created it by avitoId
+            const docDup = await Listing.findOne({ avitoId });
+            if (docDup) {
+              return res.status(200).json({ data: docDup });
+            }
+          }
+          return res.status(500).json({ error: { message: 'Failed to create listing', details: err.message } });
+        }
+      } catch (errOuter) {
+        return res.status(500).json({ error: { message: errOuter.message || 'Unexpected error' } });
       }
     } catch (error) {
       return res.status(500).json({ error: { message: error.message } });
@@ -93,5 +145,9 @@ const listingController = {
     }
   }
 };
+
+function isNonEmptyString(v) {
+  return typeof v === 'string' && v.trim().length > 0;
+}
 
 module.exports = listingController;
