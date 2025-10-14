@@ -44,5 +44,10 @@ router.get('/listings/:id', (req, res) => listingController.getById(req, res));
 // Comments for a listing
 router.get('/listings/:id/comments', (req, res) => commentController.listByListing(req, res));
 router.post('/listings/:id/comments', (req, res) => commentController.createForListing(req, res));
+router.get('/listings/:id/comments/popular', (req, res) => commentController.popularByListing(req, res));
+
+// Comment likes
+router.post('/comments/:commentId/like', (req, res) => commentController.like(req, res));
+router.post('/comments/:commentId/unlike', (req, res) => commentController.unlike(req, res));
 
 module.exports = router;
