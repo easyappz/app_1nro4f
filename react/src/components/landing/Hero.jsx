@@ -1,5 +1,4 @@
 import React from 'react';
-import { Typography, Paragraph } from 'antd/lib/typography';
 import { Button, Form, Input, Typography as AntTypography } from 'antd';
 
 const { Title, Paragraph: AntParagraph } = AntTypography;

@@ -35,7 +35,7 @@ function HomePage() {
     mutationFn: (values) => resolveListing(values.url),
     onSuccess: (listing) => {
       if (listing && listing._id) {
-        message.success('Объявление найдено!');
+        message.success('Объявление найдено! Открываю...');
         navigate(`/listing/${listing._id}`);
       } else {
         message.warning('Сервер вернул неожиданный ответ.');
@@ -48,7 +48,9 @@ function HomePage() {
   });
 
   const onFinish = (values) => {
-    doResolve(values);
+    if (isResolving) return;
+    const url = typeof values?.url === 'string' ? values.url.trim() : '';
+    doResolve({ url });
   };
 
   const handleCardClick = (id) => {
