@@ -53,3 +53,6 @@ code {
 
 /* Title spacing tweaks */
 .h-space { height: 16px; }
+
+/* Comments list small helpers */
+.comment-like { display: inline-flex; align-items: center; gap: 6px; }

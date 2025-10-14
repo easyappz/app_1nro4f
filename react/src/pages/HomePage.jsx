@@ -68,34 +68,46 @@ function HomePage() {
 
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <Card className="card-shadow">
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Title level={3} style={{ margin: 0 }}>Найти объявление по ссылке Avito</Title>
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Вставьте ссылку на объявление Avito. Мы создадим карточку и будем вести счётчик просмотров.
-          </Paragraph>
-          <Form
-            form={form}
-            layout="inline"
-            onFinish={onFinish}
-            style={{ marginTop: 8, rowGap: 12 }}
-          >
-            <Form.Item
-              name="url"
-              rules={[{ required: true, message: 'Пожалуйста, вставьте ссылку' }]}
-              style={{ flex: 1, minWidth: 280 }}
-            >
-              <Input placeholder="https://www.avito.ru/..." allowClear disabled={isResolving} />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" loading={isResolving}>
-                Найти по ссылке
-              </Button>
-            </Form.Item>
-          </Form>
-        </Space>
-      </Card>
+      {/* Hero block */}
+      <div className="home-hero">
+        <div className="home-hero__bg" />
+        <div className="container">
+          <div className="home-hero__content">
+            <div style={{ maxWidth: 880, margin: '0 auto' }}>
+              <Title level={1} style={{ marginBottom: 8, marginTop: 0, lineHeight: 1.15 }}>
+                Пишите и читайте комментарии к объявлениям Avito
+              </Title>
+              <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 20 }}>
+                Вставьте ссылку на объявление, чтобы перейти к обсуждению.
+              </Paragraph>
+              <div className="glass card-shadow search-card">
+                <Form
+                  form={form}
+                  layout="inline"
+                  size="large"
+                  onFinish={onFinish}
+                  style={{ rowGap: 12 }}
+                >
+                  <Form.Item
+                    name="url"
+                    rules={[{ required: true, message: 'Пожалуйста, вставьте ссылку' }]}
+                    style={{ flex: 1, minWidth: 280 }}
+                  >
+                    <Input placeholder="https://www.avito.ru/..." allowClear disabled={isResolving} />
+                  </Form.Item>
+                  <Form.Item>
+                    <Button type="primary" htmlType="submit" loading={isResolving} size="large">
+                      Найти по ссылке
+                    </Button>
+                  </Form.Item>
+                </Form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
+      {/* Popular listings */}
       <Card title="Самые просматриваемые" className="card-shadow">
         {isPopularLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>

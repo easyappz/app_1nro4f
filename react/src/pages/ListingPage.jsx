@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Avatar, Button, Card, Empty, Form, Input, List, Result, Space, Spin, Tag, Typography, message } from 'antd';
-import { EyeOutlined, LinkOutlined, PictureOutlined } from '@ant-design/icons';
+import { EyeOutlined, LinkOutlined, PictureOutlined, HeartOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { getListingById } from '../api/listings';
-import { createComment, getComments } from '../api/comments';
+import { createComment, getComments, likeComment, getPopularComments, unlikeComment } from '../api/comments';
 
 const { Title, Text } = Typography;
 
@@ -13,6 +13,7 @@ function ListingPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
+  const popularLimit = 2;
 
   const {
     data: listing,
@@ -38,15 +39,43 @@ function ListingPage() {
     enabled: !!id,
   });
 
+  const { data: popularComments } = useQuery({
+    queryKey: ['comments-popular', id, popularLimit],
+    queryFn: () => getPopularComments(id, popularLimit),
+    enabled: !!id,
+  });
+
+  const mergedComments = useMemo(() => {
+    const base = Array.isArray(comments) ? comments : [];
+    const pop = Array.isArray(popularComments) ? popularComments : [];
+    if (pop.length === 0) return base;
+    const seen = new Set(pop.map((c) => c._id));
+    const tail = base.filter((c) => !seen.has(c._id));
+    return [...pop, ...tail];
+  }, [comments, popularComments]);
+
   const { mutate: sendComment, isPending: isSending } = useMutation({
     mutationFn: (payload) => createComment(id, payload),
     onSuccess: () => {
       message.success('Комментарий отправлен');
       form.resetFields();
       queryClient.invalidateQueries({ queryKey: ['comments', id] });
+      queryClient.invalidateQueries({ queryKey: ['comments-popular', id, popularLimit] });
     },
     onError: (err) => {
       const msg = err?.response?.data?.error?.message || 'Не удалось отправить комментарий';
+      message.error(msg);
+    },
+  });
+
+  const { mutate: doLike, isPending: isLiking } = useMutation({
+    mutationFn: (commentId) => likeComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', id] });
+      queryClient.invalidateQueries({ queryKey: ['comments-popular', id, popularLimit] });
+    },
+    onError: (err) => {
+      const msg = err?.response?.data?.error?.message || 'Не удалось поставить лайк';
       message.error(msg);
     },
   });
@@ -136,24 +165,36 @@ function ListingPage() {
           <Empty description={commentsError?.response?.data?.error?.message || 'Не удалось загрузить комментарии'}>
             <Button onClick={() => refetchComments()}>Повторить</Button>
           </Empty>
-        ) : (Array.isArray(comments) && comments.length > 0 ? (
+        ) : (Array.isArray(mergedComments) && mergedComments.length > 0 ? (
           <List
             itemLayout="horizontal"
-            dataSource={comments}
+            dataSource={mergedComments}
             renderItem={(item) => (
-              <List.Item>
-                <List.Item.Meta
-                  avatar={<Avatar>{(item.authorName || 'А')[0].toUpperCase()}</Avatar>}
-                  title={
-                    <span>
-                      {item.authorName || 'Аноним'}
-                      <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
+              <List.Item style={{ width: '100%' }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', width: '100%' }}>
+                  <Avatar>{(item.authorName || 'А')[0].toUpperCase()}</Avatar>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <Text style={{ fontWeight: 600 }}>{item.authorName || 'Аноним'}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
                         {new Date(item.createdAt).toLocaleString('ru-RU')}
-                      </Typography.Text>
-                    </span>
-                  }
-                  description={<Typography.Text>{item.text}</Typography.Text>}
-                />
+                      </Text>
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      <Text>{item.text}</Text>
+                    </div>
+                  </div>
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Button
+                      type="text"
+                      aria-label="Поставить лайк"
+                      onClick={() => doLike(item._id)}
+                      loading={isLiking}
+                      icon={<HeartOutlined style={{ color: '#ff4d4f' }} />}
+                    />
+                    <Text type="secondary">{item.likesCount ?? 0}</Text>
+                  </div>
+                </div>
               </List.Item>
             )}
           />

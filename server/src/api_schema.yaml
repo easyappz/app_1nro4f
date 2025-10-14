@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: Listings and Comments API
-  version: 1.1.0
-  description: API for resolving Avito listings, deduplicating by avitoId, tracking popularity, and managing comments.
+  version: 1.2.0
+  description: API for resolving Avito listings, deduplicating by avitoId, tracking popularity, and managing comments with likes.
 servers:
   - url: /api
 paths:
@@ -75,7 +75,7 @@ paths:
               example:
                 data:
                   _id: 6710b8f2f1a5b0a9f3e1c123
-                  url: https://www.avito.ru/moskva/bytovaya_elektronika/iphone_14_pro_256gb_123456789
+                  url: https://www.avito.ru/moskva/bytovaya_elektronика/iphone_14_pro_256gb_123456789
                   canonicalUrl: https://www.avito.ru/moskva/iphone_14_pro_256gb_123456789
                   avitoId: '123456789'
                   mainImageUrl: https://example.cdn.avito.ru/images/123456789.jpg
@@ -269,11 +269,13 @@ paths:
                     listingId: 6710bb00f1a5b0a9f3e1c800
                     authorName: Alex
                     text: Nice offer!
+                    likesCount: 3
                     createdAt: 2025-10-14T13:05:00.000Z
                   - _id: 6710bc22f1a5b0a9f3e1c901
                     listingId: 6710bb00f1a5b0a9f3e1c800
                     authorName: Maria
                     text: Is it still available?
+                    likesCount: 0
                     createdAt: 2025-10-14T13:10:00.000Z
         '400':
           description: Invalid id
@@ -335,6 +337,7 @@ paths:
                   listingId: 6710bb00f1a5b0a9f3e1c800
                   authorName: John Doe
                   text: Please contact me
+                  likesCount: 0
                   createdAt: 2025-10-14T13:20:00.000Z
         '400':
           description: Validation error
@@ -358,6 +361,168 @@ paths:
               example:
                 error:
                   message: Listing not found
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+  /listings/{id}/comments/popular:
+    get:
+      summary: List most popular comments for a listing
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Listing ObjectId
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 2
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+              example:
+                data:
+                  - _id: 6710bc99f1a5b0a9f3e1c980
+                    listingId: 6710bb00f1a5b0a9f3e1c800
+                    authorName: Max
+                    text: Лучший лот!
+                    likesCount: 12
+                    createdAt: 2025-10-14T13:00:00.000Z
+                  - _id: 6710bc77f1a5b0a9f3e1c979
+                    listingId: 6710bb00f1a5b0a9f3e1c800
+                    authorName: Olga
+                    text: Заберу сегодня
+                    likesCount: 9
+                    createdAt: 2025-10-14T12:59:00.000Z
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid listing id
+        '404':
+          description: Listing not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Listing not found
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+  /comments/{commentId}/like:
+    post:
+      summary: Put a like on a comment
+      parameters:
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: string
+          description: Comment ObjectId
+      responses:
+        '200':
+          description: Like added (idempotent or incremented)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Comment'
+              example:
+                data:
+                  _id: 6710bc11f1a5b0a9f3e1c900
+                  listingId: 6710bb00f1a5b0a9f3e1c800
+                  authorName: Alex
+                  text: Nice offer!
+                  likesCount: 4
+                  createdAt: 2025-10-14T13:05:00.000Z
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid comment id
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Comment not found
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+  /comments/{commentId}/unlike:
+    post:
+      summary: Remove a like from a comment (not below zero)
+      parameters:
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: string
+          description: Comment ObjectId
+      responses:
+        '200':
+          description: Like removed (floored at 0)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Comment'
+              example:
+                data:
+                  _id: 6710bc11f1a5b0a9f3e1c900
+                  listingId: 6710bb00f1a5b0a9f3e1c800
+                  authorName: Alex
+                  text: Nice offer!
+                  likesCount: 3
+                  createdAt: 2025-10-14T13:05:00.000Z
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid comment id
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Comment not found
         '500':
           description: Server error
           content:
@@ -407,6 +572,11 @@ components:
           type: string
         text:
           type: string
+        likesCount:
+          type: integer
+          description: Number of likes for this comment
+          minimum: 0
+          default: 0
         createdAt:
           type: string
           format: date-time

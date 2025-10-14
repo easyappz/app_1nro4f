@@ -27,6 +27,77 @@
 /* Minor cards */
 .ant-card.card-shadow .ant-card-head-title { font-weight: 600; }
 
-/* Buttons */
-.ant-btn-primary { background: var(--brand-start); }
-.ant-btn-primary:hover, .ant-btn-primary:focus { background: var(--brand-end); }
+/* Primary buttons with brand gradient */
+.ant-btn-primary {
+  background-image: linear-gradient(90deg, var(--brand-start), var(--brand-end));
+  background-color: transparent;
+  border: none;
+  color: #fff;
+}
+.ant-btn-primary:hover,
+.ant-btn-primary:focus {
+  filter: brightness(0.98);
+}
+.ant-btn-primary:active {
+  filter: brightness(0.95);
+}
+
+/* Home hero styles */
+.home-hero {
+  position: relative;
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.home-hero__bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(1200px 600px at -10% -10%, rgba(106, 93, 246, 0.25), transparent 60%),
+              radial-gradient(900px 500px at 110% 10%, rgba(0, 180, 216, 0.2), transparent 60%),
+              linear-gradient(180deg, #f7f9ff 0%, #eef2f7 100%);
+  pointer-events: none;
+}
+.home-hero__bg::before,
+.home-hero__bg::after {
+  content: '';
+  position: absolute;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.35;
+}
+.home-hero__bg::before {
+  background: linear-gradient(135deg, var(--brand-start), #8ec5ff);
+  top: 10%;
+  left: -120px;
+}
+.home-hero__bg::after {
+  background: linear-gradient(135deg, #7ee787, var(--brand-end));
+  bottom: -80px;
+  right: -120px;
+}
+.home-hero__content {
+  position: relative;
+  width: 100%;
+  padding: 40px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Glass card */
+.glass {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+  border-radius: var(--radius);
+}
+.search-card {
+  padding: 16px;
+  max-width: 760px;
+  margin: 0 auto;
+}
