@@ -10,7 +10,7 @@ const listingController = {
       const { url } = req.body || {};
 
       if (!url || typeof url !== 'string' || !url.trim()) {
-        return res.status(400).json({ error: { message: 'Field "url" is required and must be a non-empty string' } });
+        return res.status(400).json({ error: { message: 'Field "url" is required and must be a non-empty string', details: 'Empty or non-string url' } });
       }
 
       const rawUrl = url.trim();
@@ -30,11 +30,16 @@ const listingController = {
         // If we cannot resolve avitoId specifically, return 422; otherwise 500
         const msg = e && e.message ? e.message : 'Failed to resolve listing';
         const isAvitoIdError = msg.includes('Unable to resolve avitoId');
-        return res.status(isAvitoIdError ? 422 : 500).json({ error: { message: msg } });
+        return res.status(isAvitoIdError ? 422 : 500).json({ error: { message: msg, details: e.message } });
       }
 
-      const { avitoId, title, mainImageUrl, canonicalUrl } = details;
-      const normalizedUrl = (canonicalUrl && canonicalUrl.trim()) || rawUrl;
+      const { avitoId, title, mainImageUrl, canonicalUrl } = details || {};
+
+      if (!isNonEmptyString(avitoId)) {
+        return res.status(422).json({ error: { message: 'Unable to resolve avitoId from page content or URL', details: 'Empty avitoId' } });
+      }
+
+      const normalizedUrl = (isNonEmptyString(canonicalUrl) && canonicalUrl.trim()) || rawUrl;
 
       try {
         // 1) Try to find by avitoId
@@ -99,10 +104,10 @@ const listingController = {
           return res.status(500).json({ error: { message: 'Failed to create listing', details: err.message } });
         }
       } catch (errOuter) {
-        return res.status(500).json({ error: { message: errOuter.message || 'Unexpected error' } });
+        return res.status(500).json({ error: { message: errOuter.message || 'Unexpected error', details: errOuter.message } });
       }
     } catch (error) {
-      return res.status(500).json({ error: { message: error.message } });
+      return res.status(500).json({ error: { message: error.message, details: error.message } });
     }
   },
 
@@ -117,7 +122,7 @@ const listingController = {
 
       return res.status(200).json({ data: items, meta: { limit } });
     } catch (error) {
-      return res.status(500).json({ error: { message: error.message } });
+      return res.status(500).json({ error: { message: error.message, details: error.message } });
     }
   },
 
@@ -126,7 +131,7 @@ const listingController = {
       const { id } = req.params;
 
       if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ error: { message: 'Invalid listing id' } });
+        return res.status(400).json({ error: { message: 'Invalid listing id', details: 'Bad ObjectId' } });
       }
 
       const doc = await Listing.findByIdAndUpdate(
@@ -136,12 +141,12 @@ const listingController = {
       );
 
       if (!doc) {
-        return res.status(404).json({ error: { message: 'Listing not found' } });
+        return res.status(404).json({ error: { message: 'Listing not found', details: 'No document with provided id' } });
       }
 
       return res.status(200).json({ data: doc });
     } catch (error) {
-      return res.status(500).json({ error: { message: error.message } });
+      return res.status(500).json({ error: { message: error.message, details: error.message } });
     }
   }
 };

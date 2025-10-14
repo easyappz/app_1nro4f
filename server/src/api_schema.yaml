@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Listings and Comments API
-  version: 1.2.0
+  version: 1.2.1
   description: API for resolving Avito listings, deduplicating by avitoId, tracking popularity, and managing comments with likes.
 servers:
   - url: /api
@@ -51,6 +51,7 @@ paths:
         Accepts an original Avito URL, fetches details (title, mainImageUrl, canonicalUrl),
         determines avitoId, and either links to an existing listing or creates a new one.
         Returns Listing with avitoId and mainImageUrl so the client can display the main image.
+        Deduplication is deterministic by avitoId: existing listing returns 200, new returns 201.
       requestBody:
         required: true
         content:
@@ -110,6 +111,7 @@ paths:
               example:
                 error:
                   message: Invalid URL: not-a-valid-url
+                  details: URL constructor failed
         '422':
           description: Could not determine avitoId from the provided URL/page
           content:
@@ -117,6 +119,7 @@ paths:
               example:
                 error:
                   message: Unable to resolve avitoId from page content or URL
+                  details: Empty avitoId or parse failure
         '500':
           description: Server error while resolving/creating
           content:
@@ -127,11 +130,13 @@ paths:
                   value:
                     error:
                       message: Failed to create listing
+                      details: E11000 duplicate key error
                 resolveFailed:
                   summary: Resolve failed
                   value:
                     error:
                       message: Failed to fetch Avito details: Network timeout
+                      details: Network timeout
   /listings/popular:
     get:
       summary: Get popular listings ordered by viewsCount desc
@@ -189,6 +194,7 @@ paths:
               example:
                 error:
                   message: Unexpected error
+                  details: Stack or message
   /listings/{id}:
     get:
       summary: Get listing by id and increment its viewsCount
@@ -227,6 +233,7 @@ paths:
               example:
                 error:
                   message: Invalid listing id
+                  details: Bad ObjectId
         '404':
           description: Listing not found
           content:
@@ -234,6 +241,7 @@ paths:
               example:
                 error:
                   message: Listing not found
+                  details: No document with provided id
         '500':
           description: Server error
           content:
@@ -241,6 +249,7 @@ paths:
               example:
                 error:
                   message: Unexpected error
+                  details: Stack or message
   /listings/{id}/comments:
     get:
       summary: List comments for a listing (newest first)
@@ -284,6 +293,7 @@ paths:
               example:
                 error:
                   message: Invalid listing id
+                  details: Bad ObjectId
         '404':
           description: Listing not found
           content:
@@ -291,6 +301,7 @@ paths:
               example:
                 error:
                   message: Listing not found
+                  details: No document with provided id
         '500':
           description: Server error
           content:
@@ -298,6 +309,7 @@ paths:
               example:
                 error:
                   message: Unexpected error
+                  details: Stack or message
     post:
       summary: Create a comment for a listing
       parameters:
@@ -349,11 +361,13 @@ paths:
                   value:
                     error:
                       message: Field "authorName" is required
+                      details: Empty authorName
                 missingText:
                   summary: Missing text
                   value:
                     error:
                       message: Field "text" is required
+                      details: Empty text
         '404':
           description: Listing not found
           content:
@@ -361,6 +375,7 @@ paths:
               example:
                 error:
                   message: Listing not found
+                  details: No document with provided id
         '500':
           description: Server error
           content:
@@ -368,6 +383,7 @@ paths:
               example:
                 error:
                   message: Unexpected error
+                  details: Stack or message
   /listings/{id}/comments/popular:
     get:
       summary: List most popular comments for a listing
@@ -418,6 +434,7 @@ paths:
               example:
                 error:
                   message: Invalid listing id
+                  details: Bad ObjectId
         '404':
           description: Listing not found
           content:
@@ -425,6 +442,7 @@ paths:
               example:
                 error:
                   message: Listing not found
+                  details: No document with provided id
         '500':
           description: Server error
           content:
@@ -432,6 +450,7 @@ paths:
               example:
                 error:
                   message: Unexpected error
+                  details: Stack or message
   /comments/{commentId}/like:
     post:
       summary: Put a like on a comment
@@ -467,6 +486,7 @@ paths:
               example:
                 error:
                   message: Invalid comment id
+                  details: Bad ObjectId
         '404':
           description: Comment not found
           content:
@@ -474,6 +494,7 @@ paths:
               example:
                 error:
                   message: Comment not found
+                  details: No document with provided id
         '500':
           description: Server error
           content:
@@ -481,6 +502,7 @@ paths:
               example:
                 error:
                   message: Unexpected error
+                  details: Stack or message
   /comments/{commentId}/unlike:
     post:
       summary: Remove a like from a comment (not below zero)
@@ -516,6 +538,7 @@ paths:
               example:
                 error:
                   message: Invalid comment id
+                  details: Bad ObjectId
         '404':
           description: Comment not found
           content:
@@ -523,6 +546,7 @@ paths:
               example:
                 error:
                   message: Comment not found
+                  details: No document with provided id
         '500':
           description: Server error
           content:
@@ -530,6 +554,7 @@ paths:
               example:
                 error:
                   message: Unexpected error
+                  details: Stack or message
 components:
   schemas:
     Listing:
