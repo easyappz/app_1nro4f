@@ -1,0 +1,70 @@
+openapi: 3.0.0
+info:
+  title: Avito Ads Comments API
+  version: "0.1.0"
+servers:
+  - url: /api
+paths:
+  /hello:
+    get:
+      summary: Hello test endpoint
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: Hello from API!
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /status:
+    get:
+      summary: Health check endpoint
+      responses:
+        "200":
+          description: Service status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptimeSec:
+                    type: integer
+              example:
+                status: ok
+                timestamp: 2024-01-01T00:00:00.000Z
+                uptimeSec: 42
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            details:
+              oneOf:
+                - type: string
+                - type: object
