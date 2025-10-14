@@ -1,4 +1,6 @@
 const express = require('express');
+const listingController = require('@src/controllers/listingController');
+const commentController = require('@src/controllers/commentController');
 
 const router = express.Router();
 
@@ -33,5 +35,14 @@ router.get('/status', (req, res) => {
     });
   }
 });
+
+// Listings
+router.post('/listings/resolve', (req, res) => listingController.resolveListing(req, res));
+router.get('/listings/popular', (req, res) => listingController.getPopular(req, res));
+router.get('/listings/:id', (req, res) => listingController.getById(req, res));
+
+// Comments for a listing
+router.get('/listings/:id/comments', (req, res) => commentController.listByListing(req, res));
+router.post('/listings/:id/comments', (req, res) => commentController.createForListing(req, res));
 
 module.exports = router;

@@ -1,70 +1,370 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
-  title: Avito Ads Comments API
-  version: "0.1.0"
+  title: Listings and Comments API
+  version: 1.0.0
+  description: API for resolving Avito listings, tracking popularity, and managing comments.
 servers:
   - url: /api
 paths:
   /hello:
     get:
-      summary: Hello test endpoint
+      summary: Health hello message
       responses:
-        "200":
-          description: Successful response
+        '200':
+          description: OK
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
               example:
                 message: Hello from API!
-        "500":
+        '500':
           description: Server error
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  message: Internal error
+                  details: Failed to handle /hello
   /status:
     get:
-      summary: Health check endpoint
+      summary: Service status
       responses:
-        "200":
-          description: Service status
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                status: ok
+                timestamp: 2025-01-01T00:00:00.000Z
+                uptimeSec: 123
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Internal error
+                  details: Failed to handle /status
+  /listings/resolve:
+    post:
+      summary: Resolve listing by Avito URL (find or create with fetched title)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  example: https://www.avito.ru/moskva/bytovaya_elektronika/iphone_14_pro_256gb_123456789
+      responses:
+        '200':
+          description: Listing already exists
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status:
-                    type: string
-                  timestamp:
-                    type: string
-                    format: date-time
-                  uptimeSec:
-                    type: integer
+                  data:
+                    $ref: '#/components/schemas/Listing'
               example:
-                status: ok
-                timestamp: 2024-01-01T00:00:00.000Z
-                uptimeSec: 42
-        "500":
-          description: Server error
+                data:
+                  _id: 6710b8f2f1a5b0a9f3e1c123
+                  url: https://www.avito.ru/moskva/bytovaya_elektronika/iphone_14_pro_256gb_123456789
+                  title: iPhone 14 Pro 256GB
+                  viewsCount: 12
+                  createdAt: 2025-10-14T12:00:00.000Z
+                  updatedAt: 2025-10-14T12:30:00.000Z
+        '201':
+          description: Listing created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Listing'
+              example:
+                data:
+                  _id: 6710b900f1a5b0a9f3e1c456
+                  url: https://www.avito.ru/moskva/bytovaya_elektronika/iphone_14_pro_256gb_987654321
+                  title: iPhone 14 Pro 256GB (New)
+                  viewsCount: 0
+                  createdAt: 2025-10-14T12:35:00.000Z
+                  updatedAt: 2025-10-14T12:35:00.000Z
+        '400':
+          description: Bad request (invalid url)
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid URL: not-a-valid-url
+        '500':
+          description: Server error while creating
+          content:
+            application/json:
+              example:
+                error:
+                  message: Failed to create listing
+  /listings/popular:
+    get:
+      summary: Get popular listings ordered by viewsCount desc
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Listing'
+                  meta:
+                    type: object
+                    properties:
+                      limit:
+                        type: integer
+              example:
+                data:
+                  - _id: 6710ba2bf1a5b0a9f3e1c789
+                    url: https://www.avito.ru/item/1
+                    title: First listing
+                    viewsCount: 120
+                    createdAt: 2025-10-10T10:00:00.000Z
+                    updatedAt: 2025-10-12T10:00:00.000Z
+                  - _id: 6710ba3af1a5b0a9f3e1c790
+                    url: https://www.avito.ru/item/2
+                    title: Second listing
+                    viewsCount: 90
+                    createdAt: 2025-10-09T09:00:00.000Z
+                    updatedAt: 2025-10-11T09:00:00.000Z
+                meta:
+                  limit: 20
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+  /listings/{id}:
+    get:
+      summary: Get listing by id and increment its viewsCount
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Listing ObjectId
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Listing'
+              example:
+                data:
+                  _id: 6710bb00f1a5b0a9f3e1c800
+                  url: https://www.avito.ru/item/3
+                  title: Third listing
+                  viewsCount: 51
+                  createdAt: 2025-10-08T08:00:00.000Z
+                  updatedAt: 2025-10-14T13:00:00.000Z
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid listing id
+        '404':
+          description: Listing not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Listing not found
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+  /listings/{id}/comments:
+    get:
+      summary: List comments for a listing (newest first)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Listing ObjectId
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+              example:
+                data:
+                  - _id: 6710bc11f1a5b0a9f3e1c900
+                    listingId: 6710bb00f1a5b0a9f3e1c800
+                    authorName: Alex
+                    text: Nice offer!
+                    createdAt: 2025-10-14T13:05:00.000Z
+                  - _id: 6710bc22f1a5b0a9f3e1c901
+                    listingId: 6710bb00f1a5b0a9f3e1c800
+                    authorName: Maria
+                    text: Is it still available?
+                    createdAt: 2025-10-14T13:10:00.000Z
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid listing id
+        '404':
+          description: Listing not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Listing not found
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+    post:
+      summary: Create a comment for a listing
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Listing ObjectId
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [authorName, text]
+              properties:
+                authorName:
+                  type: string
+                  example: John Doe
+                text:
+                  type: string
+                  example: Please contact me
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Comment'
+              example:
+                data:
+                  _id: 6710bd33f1a5b0a9f3e1c950
+                  listingId: 6710bb00f1a5b0a9f3e1c800
+                  authorName: John Doe
+                  text: Please contact me
+                  createdAt: 2025-10-14T13:20:00.000Z
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              examples:
+                missingAuthor:
+                  summary: Missing authorName
+                  value:
+                    error:
+                      message: Field "authorName" is required
+                missingText:
+                  summary: Missing text
+                  value:
+                    error:
+                      message: Field "text" is required
+        '404':
+          description: Listing not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Listing not found
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
 components:
   schemas:
-    ErrorResponse:
+    Listing:
       type: object
       properties:
-        error:
-          type: object
-          properties:
-            message:
-              type: string
-            details:
-              oneOf:
-                - type: string
-                - type: object
+        _id:
+          type: string
+          description: Mongo ObjectId
+        url:
+          type: string
+        title:
+          type: string
+        viewsCount:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Comment:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Mongo ObjectId
+        listingId:
+          type: string
+          description: Listing ObjectId
+        authorName:
+          type: string
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
