@@ -51,6 +51,11 @@ paths:
         Accepts an original Avito URL, fetches details (title, mainImageUrl, canonicalUrl),
         determines avitoId, and either links to an existing listing or creates a new one.
         Deduplication is deterministic by avitoId: existing listing returns 200, new returns 201.
+
+        The resolver is resilient to Avito rate limits and temporary errors (429/5xx). It performs up to 3 retries with backoff
+        and, if the page remains unavailable, uses an offline fallback to extract avitoId directly from the URL without any network calls.
+        When a valid ID is present in the URL, the service can still return 200/201 even if the page cannot be fetched.
+        Status codes remain unchanged (200/201/400/422/500).
       requestBody:
         required: true
         content:

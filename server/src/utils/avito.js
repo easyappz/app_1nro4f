@@ -39,7 +39,7 @@ function isAllHex(str) {
 }
 
 // Acceptable id can be either:
-// - numeric only, length >= 6 (as before)
+// - numeric only, length >= 6
 // - hex-like (0-9, a-f, A-F), length >= 8
 function isAcceptableId(str) {
   if (!isNonEmptyString(str)) return false;
@@ -89,7 +89,6 @@ function extractIdFromJsonLd(json) {
         if (candidates.includes(key)) {
           const s = String(value).trim();
           if (isAcceptableId(s)) return s;
-          // Some JSON-LD may embed composite strings, try splits
           const composite = tryExtractIdFromSegments(s);
           if (isNonEmptyString(composite)) return composite;
         }
@@ -106,6 +105,71 @@ function extractIdFromJsonLd(json) {
   return walk(json);
 }
 
+// Offline resolver: extract avitoId from URL path or query without any network calls
+function resolveListingIdFromUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+
+    // Prefer scanning path segments from the end
+    const pathSegments = u.pathname
+      .split('/')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (let i = pathSegments.length - 1; i >= 0; i -= 1) {
+      const candidate = tryExtractIdFromSegments(pathSegments[i]);
+      if (isNonEmptyString(candidate)) return candidate;
+    }
+
+    // Then scan query parameters
+    const keys = Array.from(u.searchParams.keys());
+    for (let i = 0; i < keys.length; i += 1) {
+      const v = u.searchParams.get(keys[i]) || '';
+      const candidate = tryExtractIdFromSegments(v);
+      if (isNonEmptyString(candidate)) return candidate;
+    }
+    return '';
+  } catch (_) {
+    return '';
+  }
+}
+
+async function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchHtmlWithRetries(url, options = {}) {
+  const backoffs = [250, 750, 1500];
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await axios.get(url, {
+        ...options,
+        validateStatus: (status) => status >= 200 && status < 400
+      });
+      return response.data;
+    } catch (err) {
+      lastError = err;
+      const status = err && err.response ? err.response.status : 0;
+      const code = err && err.code ? String(err.code) : '';
+      const shouldRetry =
+        status === 429 ||
+        (status >= 500 && status < 600) ||
+        code === 'ECONNRESET' ||
+        code === 'ETIMEDOUT';
+
+      if (!shouldRetry || attempt === 2) {
+        throw err;
+      }
+      await delay(backoffs[attempt]);
+    }
+  }
+  // Should not reach here, but in case
+  if (lastError) throw lastError;
+  throw new Error('Unknown network error while fetching HTML');
+}
+
 async function fetchAvitoDetails(url) {
   try {
     const rawUrl = String(url || '').trim();
@@ -113,18 +177,32 @@ async function fetchAvitoDetails(url) {
       throw new Error('URL is empty');
     }
 
-    const response = await axios.get(rawUrl, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7'
-      },
-      timeout: 10000,
-      maxRedirects: 5,
-      validateStatus: (status) => status >= 200 && status < 400
-    });
+    let html = '';
+    try {
+      html = await fetchHtmlWithRetries(rawUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7'
+        },
+        timeout: 10000,
+        maxRedirects: 5
+      });
+    } catch (networkErr) {
+      // Offline fallback: try to resolve ID directly from URL and return minimal data
+      const offlineId = resolveListingIdFromUrl(rawUrl);
+      if (isNonEmptyString(offlineId)) {
+        return {
+          title: '',
+          avitoId: offlineId,
+          mainImageUrl: '',
+          canonicalUrl: rawUrl
+        };
+      }
+      // If cannot even resolve ID from URL, bubble up a specific error
+      throw new Error('Unable to resolve avitoId from page content or URL');
+    }
 
-    const html = response.data;
     const $ = cheerio.load(html);
 
     // Title
@@ -164,35 +242,9 @@ async function fetchAvitoDetails(url) {
       // ignore
     }
 
-    // Fallback: parse from URL path and params (no regex). Keep path first for listings.
+    // Fallback: parse from URL using offline resolver
     if (!isNonEmptyString(avitoId)) {
-      try {
-        const u = new URL(canonicalUrl || rawUrl);
-        const pathSegments = u.pathname
-          .split('/')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        for (let i = pathSegments.length - 1; i >= 0; i -= 1) {
-          const candidate = tryExtractIdFromSegments(pathSegments[i]);
-          if (isNonEmptyString(candidate)) {
-            avitoId = candidate;
-            break;
-          }
-        }
-        if (!isNonEmptyString(avitoId)) {
-          const paramKeys = Array.from(u.searchParams.keys());
-          for (const k of paramKeys) {
-            const v = u.searchParams.get(k) || '';
-            const candidate = tryExtractIdFromSegments(v);
-            if (isNonEmptyString(candidate)) {
-              avitoId = candidate;
-              break;
-            }
-          }
-        }
-      } catch (e) {
-        // ignore URL parse
-      }
+      avitoId = resolveListingIdFromUrl(canonicalUrl || rawUrl);
     }
 
     if (!isNonEmptyString(avitoId)) {
@@ -237,7 +289,6 @@ async function fetchAvitoAccountDetails(url) {
       displayName = $('title').first().text();
     }
     if (isNonEmptyString(displayName)) {
-      // Trim common separators without regex
       const partsPipe = displayName.split('|');
       if (partsPipe.length > 1) displayName = partsPipe[0];
       const partsDash = displayName.split('—');
@@ -386,4 +437,4 @@ async function fetchAvitoAccountDetails(url) {
   }
 }
 
-module.exports = { fetchAvitoDetails, fetchAvitoAccountDetails };
+module.exports = { fetchAvitoDetails, fetchAvitoAccountDetails, resolveListingIdFromUrl };

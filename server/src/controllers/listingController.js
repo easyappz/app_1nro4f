@@ -2,7 +2,7 @@
 
 const mongoose = require('mongoose');
 const Listing = require('@src/models/Listing');
-const { fetchAvitoDetails } = require('@src/utils/avito');
+const { fetchAvitoDetails, resolveListingIdFromUrl } = require('@src/utils/avito');
 
 const listingController = {
   async resolveListing(req, res) {
@@ -21,6 +21,19 @@ const listingController = {
         new URL(rawUrl);
       } catch (e) {
         return res.status(400).json({ error: { message: `Invalid URL: ${rawUrl}`, details: e.message } });
+      }
+
+      // Fast offline pre-parse: resolve candidate avitoId from URL and short-circuit if already in DB
+      const candidateId = resolveListingIdFromUrl(rawUrl);
+      if (isNonEmptyString(candidateId)) {
+        try {
+          const existing = await Listing.findOne({ avitoId: candidateId });
+          if (existing) {
+            return res.status(200).json({ data: existing });
+          }
+        } catch (e) {
+          return res.status(500).json({ error: { message: 'Failed to check existing listing by avitoId', details: e.message } });
+        }
       }
 
       let details;
