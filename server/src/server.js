@@ -9,6 +9,7 @@ const path = require('path');
 const apiRoutes = require('@src/routes/main');
 const Listing = require('@src/models/Listing');
 const NameAssignment = require('@src/models/NameAssignment');
+const Account = require('@src/models/Account');
 
 const app = express();
 
@@ -71,6 +72,13 @@ app.use((err, req, res, next) => {
       console.log('NameAssignment indexes synchronized');
     } catch (syncErr) {
       console.error('Failed to sync NameAssignment indexes:', syncErr.message);
+    }
+
+    try {
+      await Account.syncIndexes();
+      console.log('Account indexes synchronized');
+    } catch (syncErr) {
+      console.error('Failed to sync Account indexes:', syncErr.message);
     }
   } catch (error) {
     console.error('MongoDB connection error:', error.message);

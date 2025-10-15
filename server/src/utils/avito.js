@@ -35,7 +35,7 @@ function tryExtractIdFromSegments(segment) {
 
 function extractIdFromJsonLd(json) {
   // Recursively traverse to find id-like fields
-  const candidates = ['sku', 'productID', 'productId', 'id', 'identifier', 'offerId'];
+  const candidates = ['sku', 'productID', 'productId', 'id', 'identifier', 'offerId', 'userId', 'sellerId'];
   function walk(node) {
     if (node == null) return '';
     if (typeof node === 'string' || typeof node === 'number') {
@@ -173,4 +173,145 @@ async function fetchAvitoDetails(url) {
   }
 }
 
-module.exports = { fetchAvitoDetails };
+async function fetchAvitoAccountDetails(url) {
+  try {
+    const rawUrl = String(url || '').trim();
+    if (!rawUrl) {
+      throw new Error('URL is empty');
+    }
+
+    const response = await axios.get(rawUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7'
+      },
+      timeout: 10000,
+      maxRedirects: 5,
+      validateStatus: (status) => status >= 200 && status < 400
+    });
+
+    const html = response.data;
+    const $ = cheerio.load(html);
+
+    // displayName
+    let displayName = $('meta[property="og:title"]').attr('content');
+    if (!isNonEmptyString(displayName)) {
+      displayName = $('title').first().text();
+    }
+    if (isNonEmptyString(displayName)) {
+      // Trim common separators without regex
+      const partsPipe = displayName.split('|');
+      if (partsPipe.length > 1) displayName = partsPipe[0];
+      const partsDash = displayName.split('—');
+      if (partsDash.length > 1) displayName = partsDash[0];
+      displayName = displayName.trim();
+    } else {
+      displayName = '';
+    }
+
+    // avatarUrl
+    let avatarUrl = $('meta[property="og:image"]').attr('content');
+    if (!isNonEmptyString(avatarUrl)) {
+      let found = '';
+      $('img').each((_, el) => {
+        if (isNonEmptyString(found)) return;
+        const src = $(el).attr('src') || $(el).attr('data-src') || '';
+        const s = String(src).trim();
+        if (s && s.toLowerCase().includes('avatar')) {
+          found = s;
+        }
+      });
+      avatarUrl = found;
+    }
+    avatarUrl = isNonEmptyString(avatarUrl) ? avatarUrl.trim() : '';
+
+    // canonicalUrl
+    let canonicalUrl = $('link[rel="canonical"]').attr('href');
+    if (!isNonEmptyString(canonicalUrl)) {
+      canonicalUrl = $('meta[property="og:url"]').attr('content');
+    }
+    canonicalUrl = isNonEmptyString(canonicalUrl) ? canonicalUrl.trim() : rawUrl;
+
+    // avitoUserId from JSON-LD or data attributes
+    let avitoUserId = '';
+    try {
+      const scripts = $('script[type="application/ld+json"]').toArray();
+      for (let i = 0; i < scripts.length; i += 1) {
+        if (isNonEmptyString(avitoUserId)) break;
+        const txt = $(scripts[i]).contents().text();
+        try {
+          const json = JSON.parse(txt);
+          const found = extractIdFromJsonLd(json);
+          if (isNonEmptyString(found)) avitoUserId = found;
+        } catch (e) {
+          // ignore parse
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    if (!isNonEmptyString(avitoUserId)) {
+      // Try attributes commonly used for user id
+      let foundAttr = '';
+      const candidates = ['data-user-id', 'data-seller-id', 'data-owner-id', 'data-entity-id'];
+      $('*').each((_, el) => {
+        if (isNonEmptyString(foundAttr)) return;
+        for (let i = 0; i < candidates.length; i += 1) {
+          const v = $(el).attr(candidates[i]);
+          if (isNumericString(v)) {
+            foundAttr = String(v).trim();
+            break;
+          }
+        }
+      });
+      if (isNonEmptyString(foundAttr)) avitoUserId = foundAttr;
+    }
+
+    // Fallback: parse from URL
+    if (!isNonEmptyString(avitoUserId)) {
+      try {
+        const u = new URL(canonicalUrl || rawUrl);
+        const segments = u.pathname
+          .split('/')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        for (let i = segments.length - 1; i >= 0; i -= 1) {
+          const candidate = tryExtractIdFromSegments(segments[i]);
+          if (isNonEmptyString(candidate)) {
+            avitoUserId = candidate;
+            break;
+          }
+        }
+        if (!isNonEmptyString(avitoUserId)) {
+          const keys = Array.from(u.searchParams.keys());
+          for (const k of keys) {
+            const v = u.searchParams.get(k);
+            if (isNumericString(v)) {
+              avitoUserId = v;
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    if (!isNonEmptyString(avitoUserId)) {
+      throw new Error('Unable to resolve avitoUserId from page content or URL');
+    }
+
+    return {
+      displayName: isNonEmptyString(displayName) ? displayName : '',
+      avitoUserId,
+      avatarUrl,
+      canonicalUrl
+    };
+  } catch (error) {
+    throw new Error(`Failed to fetch Avito account details: ${error.message}`);
+  }
+}
+
+module.exports = { fetchAvitoDetails, fetchAvitoAccountDetails };

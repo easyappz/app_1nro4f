@@ -1,6 +1,7 @@
 const express = require('express');
 const listingController = require('@src/controllers/listingController');
 const commentController = require('@src/controllers/commentController');
+const accountController = require('@src/controllers/accountController');
 
 const router = express.Router();
 
@@ -45,6 +46,16 @@ router.get('/listings/:id', (req, res) => listingController.getById(req, res));
 router.get('/listings/:id/comments', (req, res) => commentController.listByListing(req, res));
 router.post('/listings/:id/comments', (req, res) => commentController.createForListing(req, res));
 router.get('/listings/:id/comments/popular', (req, res) => commentController.popularByListing(req, res));
+
+// Accounts
+router.post('/accounts/resolve', (req, res) => accountController.resolveAccount(req, res));
+router.get('/accounts/popular', (req, res) => accountController.getPopular(req, res));
+router.get('/accounts/:id', (req, res) => accountController.getById(req, res));
+
+// Comments for an account
+router.get('/accounts/:id/comments', (req, res) => accountController.listByAccount(req, res));
+router.post('/accounts/:id/comments', (req, res) => accountController.createForAccount(req, res));
+router.get('/accounts/:id/comments/popular', (req, res) => accountController.popularByAccount(req, res));
 
 // Comment likes
 router.post('/comments/:commentId/like', (req, res) => commentController.like(req, res));

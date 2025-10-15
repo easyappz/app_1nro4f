@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Listings and Comments API
-  version: 1.4.0
-  description: API for resolving Avito listings, deduplicating by avitoId, tracking popularity, and managing comments with likes.
+  title: Listings, Accounts and Comments API
+  version: 1.5.0
+  description: API for resolving Avito listings and accounts, deduplicating by IDs, tracking popularity, and managing comments with likes.
 servers:
   - url: /api
 paths:
@@ -50,7 +50,6 @@ paths:
       description: |
         Accepts an original Avito URL, fetches details (title, mainImageUrl, canonicalUrl),
         determines avitoId, and either links to an existing listing or creates a new one.
-        Returns Listing with avitoId and mainImageUrl so the client can display the main image.
         Deduplication is deterministic by avitoId: existing listing returns 200, new returns 201.
       requestBody:
         required: true
@@ -73,17 +72,6 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Listing'
-              example:
-                data:
-                  _id: 6710b8f2f1a5b0a9f3e1c123
-                  url: https://www.avito.ru/moskva/bytovая_elektrоника/iphone_14_pro_256gb_123456789
-                  canonicalUrl: https://www.avito.ru/moskva/iphone_14_pro_256gb_123456789
-                  avitoId: '123456789'
-                  mainImageUrl: https://example.cdn.avito.ru/images/123456789.jpg
-                  title: iPhone 14 Pro 256GB
-                  viewsCount: 12
-                  createdAt: 2025-10-14T12:00:00.000Z
-                  updatedAt: 2025-10-14T12:30:00.000Z
         '201':
           description: Listing created
           content:
@@ -93,17 +81,6 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Listing'
-              example:
-                data:
-                  _id: 6710b900f1a5b0а9f3e1c456
-                  url: https://www.avito.ru/moskva/iphone_14_pro_256gb_987654321
-                  canonicalUrl: https://www.avito.ru/moskva/iphone_14_pro_256gb_987654321
-                  avitoId: '987654321'
-                  mainImageUrl: https://example.cdn.avito.ru/images/987654321.jpg
-                  title: iPhone 14 Pro 256GB (New)
-                  viewsCount: 0
-                  createdAt: 2025-10-14T12:35:00.000Z
-                  updatedAt: 2025-10-14T12:35:00.000Z
         '400':
           description: Bad request (invalid url)
           content:
@@ -124,19 +101,10 @@ paths:
           description: Server error while resolving/creating
           content:
             application/json:
-              examples:
-                createFailed:
-                  summary: Creation failed
-                  value:
-                    error:
-                      message: Failed to create listing
-                      details: E11000 duplicate key error
-                resolveFailed:
-                  summary: Resolve failed
-                  value:
-                    error:
-                      message: Failed to fetch Avito details: Network timeout
-                      details: Network timeout
+              example:
+                error:
+                  message: Failed to fetch Avito details: Network timeout
+                  details: Network timeout
   /listings/popular:
     get:
       summary: Get popular listings ordered by viewsCount desc
@@ -165,28 +133,6 @@ paths:
                     properties:
                       limit:
                         type: integer
-              example:
-                data:
-                  - _id: 6710ba2bf1a5b0a9f3e1c789
-                    url: https://www.avito.ru/item/1
-                    canonicalUrl: https://www.avito.ru/item/1
-                    avitoId: '111111111'
-                    mainImageUrl: https://example.cdn.avito.ru/images/111111111.jpg
-                    title: First listing
-                    viewsCount: 120
-                    createdAt: 2025-10-10T10:00:00.000Z
-                    updatedAt: 2025-10-12T10:00:00.000Z
-                  - _id: 6710ba3af1a5b0a9f3e1c790
-                    url: https://www.avito.ru/item/2
-                    canonicalUrl: https://www.avito.ru/item/2
-                    avitoId: '222222222'
-                    mainImageUrl: https://example.cdn.avito.ru/images/222222222.jpg
-                    title: Second listing
-                    viewsCount: 90
-                    createdAt: 2025-10-09T09:00:00.000Z
-                    updatedAt: 2025-10-11T09:00:00.000Z
-                meta:
-                  limit: 20
         '500':
           description: Server error
           content:
@@ -215,17 +161,6 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Listing'
-              example:
-                data:
-                  _id: 6710bb00f1a5b0a9f3e1c800
-                  url: https://www.avito.ru/item/3
-                  canonicalUrl: https://www.avito.ru/item/3
-                  avitoId: '333333333'
-                  mainImageUrl: https://example.cdn.avito.ru/images/333333333.jpg
-                  title: Third listing
-                  viewsCount: 51
-                  createdAt: 2025-10-08T08:00:00.000Z
-                  updatedAt: 2025-10-14T13:00:00.000Z
         '400':
           description: Invalid id
           content:
@@ -272,20 +207,6 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Comment'
-              example:
-                data:
-                  - _id: 6710bc11f1a5b0a9f3e1c900
-                    listingId: 6710bb00f1a5b0a9f3e1c800
-                    authorName: Alex
-                    text: Nice offer!
-                    likesCount: 3
-                    createdAt: 2025-10-14T13:05:00.000Z
-                  - _id: 6710bc22f1a5b0a9f3e1c901
-                    listingId: 6710bb00f1a5б0a9f3e1c800
-                    authorName: Maria
-                    text: Is it still available?
-                    likesCount: 0
-                    createdAt: 2025-10-14T13:10:00.000Z
         '400':
           description: Invalid id
           content:
@@ -314,7 +235,6 @@ paths:
       summary: Create a comment for a listing
       description: |
         The server deterministically generates authorName from the provided nameKey using a stable algorithm.
-        Uniqueness is guaranteed for the first 1,000,000 assignments (no repeats). After the pool is exhausted, a suffix in the form _NN is added.
         Backward compatibility: if legacy authorName is provided without nameKey, it will be used. If nameKey is present, authorName from the client is ignored.
       parameters:
         - in: path
@@ -333,18 +253,13 @@ paths:
               properties:
                 nameKey:
                   type: string
-                  description: Ключ клиента для детерминированной генерации имени на сервере. Один и тот же nameKey всегда приводит к одному и тому же authorName.
                   example: session-abc-123
                 authorName:
                   type: string
                   deprecated: true
-                  description: DEPRECATED. Ignored when nameKey is present. Kept only for backward compatibility with older clients.
                 text:
                   type: string
                   example: Please contact me
-            example:
-              nameKey: session-abc-123
-              text: Please contact me
       responses:
         '201':
           description: Comment created
@@ -355,31 +270,14 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Comment'
-              example:
-                data:
-                  _id: 6710bd33f1a5b0a9f3e1c950
-                  listingId: 6710bb00f1a5b0a9f3e1c800
-                  authorName: Яркий Сокол Пиксель
-                  text: Please contact me
-                  likesCount: 0
-                  createdAt: 2025-10-14T13:20:00.000Z
         '400':
           description: Validation error
           content:
             application/json:
-              examples:
-                missingNameKey:
-                  summary: Missing nameKey (and no legacy authorName)
-                  value:
-                    error:
-                      message: Field "nameKey" is required
-                      details: Missing nameKey
-                missingText:
-                  summary: Missing text
-                  value:
-                    error:
-                      message: Field "text" is required
-                      details: Empty text
+              example:
+                error:
+                  message: Field "text" is required
+                  details: Empty text
         '404':
           description: Listing not found
           content:
@@ -425,20 +323,6 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Comment'
-              example:
-                data:
-                  - _id: 6710bc99f1a5b0a9f3e1c980
-                    listingId: 6710bb00f1a5b0a9f3e1c800
-                    authorName: Яркий Сокол Пиксель
-                    text: Лучший лот!
-                    likesCount: 12
-                    createdAt: 2025-10-14T13:00:00.000Z
-                  - _id: 6710bc77f1a5b0a9f3e1c979
-                    listingId: 6710bb00f1a5b0a9f3e1c800
-                    authorName: Смелый Волк Мост
-                    text: Заберу сегодня
-                    likesCount: 9
-                    createdAt: 2025-10-14T12:59:00.000Z
         '400':
           description: Invalid id
           content:
@@ -463,6 +347,323 @@ paths:
                 error:
                   message: Unexpected error
                   details: Stack or message
+
+  /accounts/resolve:
+    post:
+      summary: Resolve Avito account by URL and deduplicate by avitoUserId
+      description: |
+        Accepts Avito profile URL, fetches details (displayName, avatarUrl, canonicalUrl), determines avitoUserId.
+        Returns existing account with 200 or creates a new one with 201.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  example: https://www.avito.ru/profile/123456789
+      responses:
+        '200':
+          description: Account exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Account'
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Account'
+        '400':
+          description: Invalid URL
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid URL: not-a-url
+                  details: URL constructor failed
+        '422':
+          description: Could not determine avitoUserId
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unable to resolve avitoUserId from page content or URL
+                  details: Empty avitoUserId
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Failed to fetch Avito account details: Network timeout
+                  details: Network timeout
+
+  /accounts/popular:
+    get:
+      summary: Get popular accounts ordered by viewsCount desc
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Account'
+                  meta:
+                    type: object
+                    properties:
+                      limit:
+                        type: integer
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+                  details: Stack or message
+
+  /accounts/{id}:
+    get:
+      summary: Get account by id and increment its viewsCount
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Account ObjectId
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Account'
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid account id
+                  details: Bad ObjectId
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Account not found
+                  details: No document with provided id
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+                  details: Stack or message
+
+  /accounts/{id}/comments:
+    get:
+      summary: List comments for an account (newest first)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Account ObjectId
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid account id
+                  details: Bad ObjectId
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Account not found
+                  details: No document with provided id
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+                  details: Stack or message
+    post:
+      summary: Create a comment for an account
+      description: |
+        The server deterministically generates authorName from the provided nameKey using a stable algorithm.
+        Backward compatibility is supported via legacy authorName when nameKey is absent.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Account ObjectId
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nameKey, text]
+              properties:
+                nameKey:
+                  type: string
+                  example: session-xyz-987
+                authorName:
+                  type: string
+                  deprecated: true
+                text:
+                  type: string
+                  example: Great seller!
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Comment'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              examples:
+                missingNameKey:
+                  summary: Missing nameKey (and no legacy authorName)
+                  value:
+                    error:
+                      message: Field "nameKey" is required
+                      details: Missing nameKey
+                missingText:
+                  summary: Missing text
+                  value:
+                    error:
+                      message: Field "text" is required
+                      details: Empty text
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Account not found
+                  details: No document with provided id
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+                  details: Stack or message
+
+  /accounts/{id}/comments/popular:
+    get:
+      summary: List most popular comments for an account
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Account ObjectId
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 2
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              example:
+                error:
+                  message: Invalid account id
+                  details: Bad ObjectId
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              example:
+                error:
+                  message: Account not found
+                  details: No document with provided id
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                error:
+                  message: Unexpected error
+                  details: Stack or message
+
   /comments/{commentId}/like:
     post:
       summary: Put a like on a comment
@@ -483,14 +684,6 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Comment'
-              example:
-                data:
-                  _id: 6710bc11f1a5b0a9f3e1c900
-                  listingId: 6710bb00f1a5b0a9f3е1c800
-                  authorName: Яркий Сокол Пиксель
-                  text: Nice offer!
-                  likesCount: 4
-                  createdAt: 2025-10-14T13:05:00.000Z
         '400':
           description: Invalid id
           content:
@@ -535,14 +728,6 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Comment'
-              example:
-                data:
-                  _id: 6710bc11f1a5b0a9f3e1c900
-                  listingId: 6710bb00f1a5b0a9f3e1c800
-                  authorName: Смелый Лев Код
-                  text: Nice offer!
-                  likesCount: 3
-                  createdAt: 2025-10-14T13:05:00.000Z
         '400':
           description: Invalid id
           content:
@@ -596,6 +781,32 @@ components:
         updatedAt:
           type: string
           format: date-time
+    Account:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Mongo ObjectId
+        url:
+          type: string
+        canonicalUrl:
+          type: string
+        avitoUserId:
+          type: string
+          description: Unique Avito user id
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+        viewsCount:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     Comment:
       type: object
       properties:
@@ -604,11 +815,13 @@ components:
           description: Mongo ObjectId
         listingId:
           type: string
-          description: Listing ObjectId
+          description: Listing ObjectId (either listingId or accountId is present)
+        accountId:
+          type: string
+          description: Account ObjectId (either listingId or accountId is present)
         authorName:
           type: string
-          description: |
-            Generated on the server from nameKey. Guaranteed no repeats for the first 1,000,000 assignments; after pool exhaustion a suffix _NN is added. The same nameKey always yields the same authorName.
+          description: Generated on the server from nameKey. Same nameKey always yields the same authorName.
         text:
           type: string
         likesCount:
