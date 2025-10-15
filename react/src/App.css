@@ -149,6 +149,25 @@
   max-width: 760px;
   margin: 0 auto;
 }
+/* Inline form responsive alignment for search */
+.search-card .ant-form {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 12px;
+  column-gap: 12px;
+  justify-content: center;
+}
+.search-card .ant-form-item {
+  margin-bottom: 0;
+}
+.search-card .ant-segmented {
+  min-width: 210px;
+}
+@media (min-width: 768px) {
+  .search-card .ant-form {
+    justify-content: center;
+  }
+}
 
 /* Sections */
 .section-title { margin: 0 0 4px; }

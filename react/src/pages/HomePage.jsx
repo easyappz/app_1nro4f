@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, message, Segmented, Space } from 'antd';
+import { Form, message } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { resolveListing, getPopular } from '../api/listings';
@@ -90,7 +90,6 @@ function HomePage() {
     if (isResolving) return; // prevent double submit
     const url = typeof values?.url === 'string' ? values.url.trim() : '';
 
-    // Friendly pending status
     messageApi.open({
       key: MSG_KEY,
       type: 'loading',
@@ -119,18 +118,13 @@ function HomePage() {
         <meta property="og:url" content={currentUrl} />
       </Helmet>
 
-      <Space direction="vertical" size={12} style={{ width: '100%', marginBottom: 12 }}>
-        <Segmented
-          options={[
-            { label: 'Объявление', value: 'listing' },
-            { label: 'Профиль продавца', value: 'account' },
-          ]}
-          value={resolveType}
-          onChange={(val) => setResolveType(val)}
-        />
-      </Space>
-
-      <Hero form={form} isResolving={isResolving} onFinish={onFinish} />
+      <Hero
+        form={form}
+        isResolving={isResolving}
+        onFinish={onFinish}
+        resolveType={resolveType}
+        onResolveTypeChange={setResolveType}
+      />
       <Steps />
       <Benefits />
       <Popular

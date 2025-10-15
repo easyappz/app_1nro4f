@@ -1,9 +1,9 @@
 import React from 'react';
-import { Button, Form, Input, Typography as AntTypography } from 'antd';
+import { Button, Form, Input, Segmented, Typography as AntTypography } from 'antd';
 
 const { Title, Paragraph: AntParagraph } = AntTypography;
 
-function Hero({ form, isResolving, onFinish }) {
+function Hero({ form, isResolving, onFinish, resolveType, onResolveTypeChange }) {
   return (
     <section className="home-hero" aria-label="Герой раздел с поиском по ссылке">
       <div className="home-hero__bg" />
@@ -20,7 +20,7 @@ function Hero({ form, isResolving, onFinish }) {
               Пишите и читайте комментарии к объявлениям Avito
             </Title>
             <AntParagraph type="secondary" style={{ fontSize: 16, marginBottom: 20 }}>
-              Вставьте ссылку на объявление, чтобы перейти к обсуждению.
+              Вставьте ссылку на объявление или профиль Avito, чтобы перейти к обсуждению.
             </AntParagraph>
             <div className="glass card-shadow search-card" id="search-anchor">
               <Form
@@ -28,9 +28,20 @@ function Hero({ form, isResolving, onFinish }) {
                 layout="inline"
                 size="large"
                 onFinish={onFinish}
-                aria-label="Форма поиска объявления по ссылке"
-                style={{ rowGap: 12 }}
+                aria-label="Форма поиска по ссылке на объявление или профиль Avito"
+                style={{ rowGap: 12, flexWrap: 'wrap' }}
               >
+                <Form.Item style={{ minWidth: 210 }}>
+                  <Segmented
+                    options={[
+                      { label: 'Объявление', value: 'listing' },
+                      { label: 'Профиль пользователя', value: 'account' },
+                    ]}
+                    value={resolveType}
+                    onChange={onResolveTypeChange}
+                    aria-label="Переключатель: объявление или профиль"
+                  />
+                </Form.Item>
                 <Form.Item
                   name="url"
                   rules={[{ required: true, message: 'Пожалуйста, вставьте ссылку' }]}
@@ -40,7 +51,7 @@ function Hero({ form, isResolving, onFinish }) {
                     placeholder="https://www.avito.ru/..."
                     allowClear
                     disabled={isResolving}
-                    aria-label="Поле для ссылки на объявление Avito"
+                    aria-label="Поле для ссылки на объявление или профиль Avito"
                   />
                 </Form.Item>
                 <Form.Item>
