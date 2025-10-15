@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Listings and Comments API
-  version: 1.3.0
+  version: 1.4.0
   description: API for resolving Avito listings, deduplicating by avitoId, tracking popularity, and managing comments with likes.
 servers:
   - url: /api
@@ -76,7 +76,7 @@ paths:
               example:
                 data:
                   _id: 6710b8f2f1a5b0a9f3e1c123
-                  url: https://www.avito.ru/moskva/bytovaya_elektrоника/iphone_14_pro_256gb_123456789
+                  url: https://www.avito.ru/moskva/bytovая_elektrоника/iphone_14_pro_256gb_123456789
                   canonicalUrl: https://www.avito.ru/moskva/iphone_14_pro_256gb_123456789
                   avitoId: '123456789'
                   mainImageUrl: https://example.cdn.avito.ru/images/123456789.jpg
@@ -95,7 +95,7 @@ paths:
                     $ref: '#/components/schemas/Listing'
               example:
                 data:
-                  _id: 6710b900f1a5b0a9f3e1c456
+                  _id: 6710b900f1a5b0а9f3e1c456
                   url: https://www.avito.ru/moskva/iphone_14_pro_256gb_987654321
                   canonicalUrl: https://www.avito.ru/moskva/iphone_14_pro_256gb_987654321
                   avitoId: '987654321'
@@ -281,7 +281,7 @@ paths:
                     likesCount: 3
                     createdAt: 2025-10-14T13:05:00.000Z
                   - _id: 6710bc22f1a5b0a9f3e1c901
-                    listingId: 6710bb00f1a5b0a9f3e1c800
+                    listingId: 6710bb00f1a5б0a9f3e1c800
                     authorName: Maria
                     text: Is it still available?
                     likesCount: 0
@@ -314,6 +314,7 @@ paths:
       summary: Create a comment for a listing
       description: |
         The server deterministically generates authorName from the provided nameKey using a stable algorithm.
+        Uniqueness is guaranteed for the first 1,000,000 assignments (no repeats). After the pool is exhausted, a suffix in the form _NN is added.
         Backward compatibility: if legacy authorName is provided without nameKey, it will be used. If nameKey is present, authorName from the client is ignored.
       parameters:
         - in: path
@@ -332,7 +333,7 @@ paths:
               properties:
                 nameKey:
                   type: string
-                  description: Ключ клиента для детерминированной генерации имени на сервере, стабильный в пределах сессии.
+                  description: Ключ клиента для детерминированной генерации имени на сервере. Один и тот же nameKey всегда приводит к одному и тому же authorName.
                   example: session-abc-123
                 authorName:
                   type: string
@@ -358,7 +359,7 @@ paths:
                 data:
                   _id: 6710bd33f1a5b0a9f3e1c950
                   listingId: 6710bb00f1a5b0a9f3e1c800
-                  authorName: Яркий Сокол
+                  authorName: Яркий Сокол Пиксель
                   text: Please contact me
                   likesCount: 0
                   createdAt: 2025-10-14T13:20:00.000Z
@@ -428,13 +429,13 @@ paths:
                 data:
                   - _id: 6710bc99f1a5b0a9f3e1c980
                     listingId: 6710bb00f1a5b0a9f3e1c800
-                    authorName: Max
+                    authorName: Яркий Сокол Пиксель
                     text: Лучший лот!
                     likesCount: 12
                     createdAt: 2025-10-14T13:00:00.000Z
                   - _id: 6710bc77f1a5b0a9f3e1c979
                     listingId: 6710bb00f1a5b0a9f3e1c800
-                    authorName: Olga
+                    authorName: Смелый Волк Мост
                     text: Заберу сегодня
                     likesCount: 9
                     createdAt: 2025-10-14T12:59:00.000Z
@@ -485,8 +486,8 @@ paths:
               example:
                 data:
                   _id: 6710bc11f1a5b0a9f3e1c900
-                  listingId: 6710bb00f1a5b0a9f3e1c800
-                  authorName: Alex
+                  listingId: 6710bb00f1a5b0a9f3е1c800
+                  authorName: Яркий Сокол Пиксель
                   text: Nice offer!
                   likesCount: 4
                   createdAt: 2025-10-14T13:05:00.000Z
@@ -538,7 +539,7 @@ paths:
                 data:
                   _id: 6710bc11f1a5b0a9f3e1c900
                   listingId: 6710bb00f1a5b0a9f3e1c800
-                  authorName: Alex
+                  authorName: Смелый Лев Код
                   text: Nice offer!
                   likesCount: 3
                   createdAt: 2025-10-14T13:05:00.000Z
@@ -606,6 +607,8 @@ components:
           description: Listing ObjectId
         authorName:
           type: string
+          description: |
+            Generated on the server from nameKey. Guaranteed no repeats for the first 1,000,000 assignments; after pool exhaustion a suffix _NN is added. The same nameKey always yields the same authorName.
         text:
           type: string
         likesCount:

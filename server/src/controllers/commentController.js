@@ -69,12 +69,12 @@ const commentController = {
 
       let finalName = '';
       if (key) {
-        finalName = displayNameFromKey(key);
+        finalName = await displayNameFromKey(key);
       } else if (legacyName) {
         // Backward compatibility for older clients
         finalName = legacyName;
       } else {
-        return res.status(400).json({ error: { message: 'Field "nameKey" is required', details: 'Missing "nameKey" and legacy "authorName"' } });
+        return res.status(400).json({ error: { message: 'Field "nameKey" is required', details: 'Missing nameKey' } });
       }
 
       const created = await Comment.create({ listingId: listing._id, authorName: finalName, text: body });
