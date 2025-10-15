@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Listings, Accounts and Comments API
-  version: 1.5.0
+  version: 1.5.1
   description: API for resolving Avito listings and accounts, deduplicating by IDs, tracking popularity, and managing comments with likes.
 servers:
   - url: /api
@@ -353,6 +353,7 @@ paths:
       summary: Resolve Avito account by URL and deduplicate by avitoUserId
       description: |
         Accepts Avito profile URL, fetches details (displayName, avatarUrl, canonicalUrl), determines avitoUserId.
+        Supports numeric and hex identifiers (e.g., sellerId=708ad9c736d8ff0eec6a8d558bcfd7c3), including brand pages like /brands/... with sellerId in query.
         Returns existing account with 200 or creates a new one with 201.
       requestBody:
         required: true
@@ -364,7 +365,7 @@ paths:
               properties:
                 url:
                   type: string
-                  example: https://www.avito.ru/profile/123456789
+                  example: https://www.avito.ru/brands/awesome-dealer?sellerId=708ad9c736d8ff0eec6a8d558bcfd7c3
       responses:
         '200':
           description: Account exists
@@ -393,7 +394,7 @@ paths:
                   message: Invalid URL: not-a-url
                   details: URL constructor failed
         '422':
-          description: Could not determine avitoUserId
+          description: Unable to resolve avitoUserId from page content or URL (numeric and hex identifiers are supported)
           content:
             application/json:
               example:
@@ -793,7 +794,8 @@ components:
           type: string
         avitoUserId:
           type: string
-          description: Unique Avito user id
+          description: Unique Avito user id (numeric or hex). Example of hex sellerId: 708ad9c736d8ff0eec6a8d558bcfd7c3
+          example: 708ad9c736d8ff0eec6a8d558bcfd7c3
         displayName:
           type: string
         avatarUrl:

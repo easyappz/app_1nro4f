@@ -7,28 +7,60 @@ function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
 }
 
-function isNumericString(str) {
+function isDigitCharCode(code) {
+  return code >= 48 && code <= 57; // 0-9
+}
+
+function isHexAlphaCharCode(code) {
+  // A-F or a-f
+  return (code >= 65 && code <= 70) || (code >= 97 && code <= 102);
+}
+
+function isAllDigits(str) {
   if (!isNonEmptyString(str)) return false;
   const s = String(str).trim();
-  if (s.length < 6) return false;
+  if (s.length === 0) return false;
   for (let i = 0; i < s.length; i += 1) {
     const c = s.charCodeAt(i);
-    if (c < 48 || c > 57) return false;
+    if (!isDigitCharCode(c)) return false;
   }
   return true;
 }
 
+function isAllHex(str) {
+  if (!isNonEmptyString(str)) return false;
+  const s = String(str).trim();
+  if (s.length === 0) return false;
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s.charCodeAt(i);
+    if (!isDigitCharCode(c) && !isHexAlphaCharCode(c)) return false;
+  }
+  return true;
+}
+
+// Acceptable id can be either:
+// - numeric only, length >= 6 (as before)
+// - hex-like (0-9, a-f, A-F), length >= 8
+function isAcceptableId(str) {
+  if (!isNonEmptyString(str)) return false;
+  const s = String(str).trim();
+  if (s.length >= 6 && isAllDigits(s)) return true;
+  if (s.length >= 8 && isAllHex(s)) return true;
+  return false;
+}
+
 function tryExtractIdFromSegments(segment) {
-  // Try split on common delimiters without regex
+  // Try split on common delimiters without regex and pick the last acceptable candidate
   const parts = String(segment)
     .split('/')
     .map((p) => String(p).trim())
     .filter(Boolean)
     .flatMap((p) => p.split('-'))
     .flatMap((p) => p.split('_'))
-    .map((p) => p.trim());
+    .map((p) => p.trim())
+    .filter(Boolean);
   for (let i = parts.length - 1; i >= 0; i -= 1) {
-    if (isNumericString(parts[i])) return parts[i];
+    if (isAcceptableId(parts[i])) return parts[i];
   }
   return '';
 }
@@ -39,8 +71,8 @@ function extractIdFromJsonLd(json) {
   function walk(node) {
     if (node == null) return '';
     if (typeof node === 'string' || typeof node === 'number') {
-      const s = String(node);
-      if (isNumericString(s)) return s;
+      const s = String(node).trim();
+      if (isAcceptableId(s)) return s;
       return '';
     }
     if (Array.isArray(node)) {
@@ -51,11 +83,15 @@ function extractIdFromJsonLd(json) {
       return '';
     }
     if (typeof node === 'object') {
+      // First pass: look for known keys
       for (const key of Object.keys(node)) {
         const value = node[key];
         if (candidates.includes(key)) {
-          const s = String(value);
-          if (isNumericString(s)) return s;
+          const s = String(value).trim();
+          if (isAcceptableId(s)) return s;
+          // Some JSON-LD may embed composite strings, try splits
+          const composite = tryExtractIdFromSegments(s);
+          if (isNonEmptyString(composite)) return composite;
         }
       }
       // Second pass: deep walk
@@ -128,7 +164,7 @@ async function fetchAvitoDetails(url) {
       // ignore
     }
 
-    // Fallback: parse from URL path and params (no regex)
+    // Fallback: parse from URL path and params (no regex). Keep path first for listings.
     if (!isNonEmptyString(avitoId)) {
       try {
         const u = new URL(canonicalUrl || rawUrl);
@@ -146,9 +182,10 @@ async function fetchAvitoDetails(url) {
         if (!isNonEmptyString(avitoId)) {
           const paramKeys = Array.from(u.searchParams.keys());
           for (const k of paramKeys) {
-            const v = u.searchParams.get(k);
-            if (isNumericString(v)) {
-              avitoId = v;
+            const v = u.searchParams.get(k) || '';
+            const candidate = tryExtractIdFromSegments(v);
+            if (isNonEmptyString(candidate)) {
+              avitoId = candidate;
               break;
             }
           }
@@ -260,8 +297,17 @@ async function fetchAvitoAccountDetails(url) {
         if (isNonEmptyString(foundAttr)) return;
         for (let i = 0; i < candidates.length; i += 1) {
           const v = $(el).attr(candidates[i]);
-          if (isNumericString(v)) {
-            foundAttr = String(v).trim();
+          if (!isNonEmptyString(v)) continue;
+          const val = String(v).trim();
+          // Try direct value first
+          if (isAcceptableId(val)) {
+            foundAttr = val;
+            break;
+          }
+          // Try split-based extraction
+          const composite = tryExtractIdFromSegments(val);
+          if (isNonEmptyString(composite)) {
+            foundAttr = composite;
             break;
           }
         }
@@ -273,29 +319,55 @@ async function fetchAvitoAccountDetails(url) {
     if (!isNonEmptyString(avitoUserId)) {
       try {
         const u = new URL(canonicalUrl || rawUrl);
-        const segments = u.pathname
-          .split('/')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        for (let i = segments.length - 1; i >= 0; i -= 1) {
-          const candidate = tryExtractIdFromSegments(segments[i]);
-          if (isNonEmptyString(candidate)) {
-            avitoUserId = candidate;
+
+        // 1) Prefer sellerId query parameter (case-insensitive)
+        const keys = Array.from(u.searchParams.keys());
+        let sellerKey = '';
+        for (let i = 0; i < keys.length; i += 1) {
+          const k = keys[i];
+          if (String(k).toLowerCase() === 'sellerid') {
+            sellerKey = k;
             break;
           }
         }
+        if (sellerKey) {
+          const v = u.searchParams.get(sellerKey) || '';
+          const candidateFromSeller = tryExtractIdFromSegments(v);
+          if (isNonEmptyString(candidateFromSeller)) {
+            avitoUserId = candidateFromSeller;
+          }
+        }
+
+        // 2) If not found, scan other params
         if (!isNonEmptyString(avitoUserId)) {
-          const keys = Array.from(u.searchParams.keys());
-          for (const k of keys) {
-            const v = u.searchParams.get(k);
-            if (isNumericString(v)) {
-              avitoUserId = v;
+          for (let i = 0; i < keys.length; i += 1) {
+            const k = keys[i];
+            if (k === sellerKey) continue;
+            const v = u.searchParams.get(k) || '';
+            const candidate = tryExtractIdFromSegments(v);
+            if (isNonEmptyString(candidate)) {
+              avitoUserId = candidate;
+              break;
+            }
+          }
+        }
+
+        // 3) If still not found, scan path segments
+        if (!isNonEmptyString(avitoUserId)) {
+          const segments = u.pathname
+            .split('/')
+            .map((s) => s.trim())
+            .filter(Boolean);
+          for (let i = segments.length - 1; i >= 0; i -= 1) {
+            const candidate = tryExtractIdFromSegments(segments[i]);
+            if (isNonEmptyString(candidate)) {
+              avitoUserId = candidate;
               break;
             }
           }
         }
       } catch (e) {
-        // ignore
+        // ignore URL parse
       }
     }
 
