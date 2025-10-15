@@ -17,3 +17,9 @@ export async function getListingById(id) {
   const res = await instance.get(`/api/listings/${id}`);
   return res.data?.data;
 }
+
+// Force enrichment for a listing and return updated document
+export async function enrichListing(id) {
+  const res = await instance.post(`/api/listings/${id}/enrich`);
+  return res.data?.data;
+}

@@ -4,7 +4,7 @@ import { Avatar, Button, Card, Empty, Form, Input, List, Result, Space, Spin, Ta
 import { EyeOutlined, LinkOutlined, PictureOutlined, HeartOutlined, ReloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
-import { getListingById } from '../api/listings';
+import { getListingById, enrichListing } from '../api/listings';
 import { createComment, getComments, likeComment, getPopularComments } from '../api/comments';
 import getOrCreateNameKey from '../api/nameKey';
 
@@ -91,6 +91,11 @@ function ListingPage() {
     },
   });
 
+  // Manual forced enrichment
+  const { mutateAsync: runEnrich, isPending: isEnriching } = useMutation({
+    mutationFn: () => enrichListing(id),
+  });
+
   const handleOpenOriginal = () => {
     if (listing?.url) {
       window.open(listing.url, '_blank', 'noopener');
@@ -170,11 +175,26 @@ function ListingPage() {
   }, [listing, isMinimal, refetchListing]);
 
   const handleManualRefresh = async () => {
+    // Stop current timer to avoid double refetch
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    await refetchListing();
+
+    // Start enrichment flow
+    const key = 'listing-enrich';
+    message.open({ key, type: 'loading', content: 'Пробуем загрузить данные…', duration: 0 });
+    try {
+      await runEnrich();
+      message.open({ key, type: 'success', content: 'Данные обновлены, проверяем…' });
+      await refetchListing();
+      // After manual refetch, reset backoff to continue gentle polling if still minimal
+      attemptsRef.current = 0;
+      totalMsRef.current = 0;
+    } catch (err) {
+      const msg = err?.response?.data?.error?.message || 'Не удалось обновить данные объявления';
+      message.open({ key, type: 'error', content: msg });
+    }
   };
 
   if (isListingLoading) {
@@ -225,12 +245,12 @@ function ListingPage() {
             <div>
               <div>Сейчас недоступны заголовок и главное фото. Мы автоматически обновляем данные в фоне.</div>
               <div style={{ marginTop: 4, color: 'rgba(0,0,0,0.45)' }}>
-                Обновление выполняется с паузами 2–30 секунд до 3 минут или до появления данных.
+                Обновление выполняется с паузами 2–30 секунд до 3 минут или до появления данных. Можно нажать «Обновить данные», чтобы форсировать загрузку.
               </div>
             </div>
           }
           action={
-            <Button type="primary" icon={<ReloadOutlined />} onClick={handleManualRefresh} loading={isListingRefetching}>
+            <Button type="primary" icon={<ReloadOutlined />} onClick={handleManualRefresh} loading={isEnriching || isListingRefetching}>
               Обновить данные
             </Button>
           }
