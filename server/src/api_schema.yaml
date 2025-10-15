@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Listings, Accounts and Comments API
-  version: 1.6.0
+  version: 1.7.0
   description: API for resolving Avito listings and accounts, deduplicating by IDs, tracking popularity, and managing comments with likes.
 servers:
   - url: /api
@@ -52,14 +52,16 @@ paths:
         determines avitoId, and either links to an existing listing or creates a new one.
         Deduplication is deterministic by avitoId: existing listing returns 200, new returns 201.
 
-        The resolver is resilient to Avito rate limits and temporary errors (429/5xx). It performs up to 3 retries with backoff
-        and, if the page remains unavailable, uses an offline fallback to extract avitoId directly from the URL without any network calls.
-        When a valid ID is present in the URL, the service can still return 200/201 even if the page cannot be fetched.
-        Status codes remain unchanged (200/201/400/422/500).
+        The resolver is resilient to Avito rate limits and temporary errors (429/5xx). It performs up to 5 retries with backoff
+        [250ms, 750ms, 1500ms, 3000ms, 5000ms] and, if the page remains unavailable, uses an offline fallback to extract avitoId
+        directly from the URL without any network calls. When a valid ID is present in the URL, the service can still return 200/201
+        even if the page cannot be fetched. In offline mode, canonicalUrl is preserved as the original URL and a fallbackTitle
+        is attempted from the URL path (last segment split by '_' and '-', skipping the token equal to avitoId). The first word is capitalized.
 
-        Note on lazy enrichment: If the initial fetch returns minimal offline data (usually empty title and mainImageUrl),
-        the service will respond immediately with minimal data and trigger background enrichment. Within a short time,
-        subsequent GET /listings/{id} requests may return enriched fields.
+        Note on lazy enrichment: If the initial fetch returns minimal offline data (e.g., empty mainImageUrl or title),
+        the service may trigger background enrichment. You can also force enrichment via POST /listings/{id}/enrich.
+
+        Diagnostics: server records the outcome of background enrichments including the last error in the field lastEnrichError.
       requestBody:
         required: true
         content:
@@ -155,8 +157,10 @@ paths:
       summary: Get listing by id and increment its viewsCount
       description: |
         Returns a listing document and increments its viewsCount. If the listing lacks title or mainImageUrl,
-        the service may trigger a background lazy enrichment (throttled and with limited attempts) and still return the current document immediately.
+        the service may trigger a background lazy enrichment (throttled and with limited attempts up to 12) and still return the current document immediately.
         Clients can re-fetch after a short delay to get enriched fields.
+
+        Diagnostics: field lastEnrichError contains the message from the most recent failed enrichment attempt (if any).
       parameters:
         - in: path
           name: id
@@ -756,6 +760,9 @@ components:
           type: integer
           minimum: 0
           description: Number of background enrichment attempts performed
+        lastEnrichError:
+          type: string
+          description: Message of the last failed enrichment attempt (empty when the last enrichment succeeded with improvements)
         createdAt:
           type: string
           format: date-time

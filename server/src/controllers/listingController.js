@@ -5,7 +5,7 @@ const Listing = require('@src/models/Listing');
 const { fetchAvitoDetails, resolveListingIdFromUrl } = require('@src/utils/avito');
 
 const ENRICH_MIN_INTERVAL_MS = 60 * 1000; // 60 seconds
-const ENRICH_MAX_ATTEMPTS = 5;
+const ENRICH_MAX_ATTEMPTS = 12;
 
 const listingController = {
   async resolveListing(req, res) {
@@ -43,7 +43,6 @@ const listingController = {
       try {
         details = await fetchAvitoDetails(rawUrl);
       } catch (e) {
-        // If we cannot resolve avitoId specifically, return 422; otherwise 500
         const msg = e && e.message ? e.message : 'Failed to resolve listing';
         const isAvitoIdError = msg.includes('Unable to resolve avitoId');
         return res.status(isAvitoIdError ? 422 : 500).json({ error: { message: msg, details: e.message } });
@@ -193,6 +192,35 @@ const listingController = {
     } catch (error) {
       return res.status(500).json({ error: { message: error.message, details: error.message } });
     }
+  },
+
+  async enrichNow(req, res) {
+    try {
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: { message: 'Invalid listing id', details: 'Bad ObjectId' } });
+      }
+
+      const exists = await Listing.findById(id);
+      if (!exists) {
+        return res.status(404).json({ error: { message: 'Listing not found', details: 'No document with provided id' } });
+      }
+
+      try {
+        await enrichListingSafe(id, 'enrichNow');
+      } catch (e) {
+        return res.status(500).json({ error: { message: 'Failed to enrich listing', details: e.message } });
+      }
+
+      try {
+        const updated = await Listing.findById(id);
+        return res.status(200).json({ data: updated });
+      } catch (e) {
+        return res.status(500).json({ error: { message: 'Failed to load enriched listing', details: e.message } });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: { message: error.message, details: error.message } });
+    }
   }
 };
 
@@ -236,9 +264,9 @@ async function enrichListingSafe(listingId, reason) {
     try {
       details = await fetchAvitoDetails(targetUrl);
     } catch (e) {
-      // Even on failure, record attempt timestamp to avoid hot loops
+      // Even on failure, record attempt timestamp and last error to avoid hot loops and expose diagnostics
       await Listing.findByIdAndUpdate(listingId, {
-        $set: { lastEnrichedAt: new Date() },
+        $set: { lastEnrichedAt: new Date(), lastEnrichError: e.message },
         $inc: { enrichAttempts: 1 }
       }).catch((err) => console.error('[lazy-enrich] mark failed attempt:', err.message));
       console.warn(`[lazy-enrich] fetch failed (id=${listingId}, reason=${reason}):`, e.message);
@@ -261,6 +289,10 @@ async function enrichListingSafe(listingId, reason) {
       hasFieldImprovements = true;
     }
 
+    if (hasFieldImprovements) {
+      updatesSet.lastEnrichError = '';
+    }
+
     // Always store attempt/time; update fields only if improved
     await Listing.findByIdAndUpdate(listingId, {
       $set: updatesSet,
@@ -272,6 +304,14 @@ async function enrichListingSafe(listingId, reason) {
     }
   } catch (error) {
     console.error('[lazy-enrich] unexpected error:', error.message);
+    try {
+      await Listing.findByIdAndUpdate(listingId, {
+        $set: { lastEnrichedAt: new Date(), lastEnrichError: error.message },
+        $inc: { enrichAttempts: 1 }
+      });
+    } catch (e) {
+      // ignore secondary failure
+    }
   }
 }
 

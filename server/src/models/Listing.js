@@ -12,7 +12,8 @@ const ListingSchema = new mongoose.Schema(
     viewsCount: { type: Number, default: 0, min: 0 },
     // Lazy enrichment service fields
     lastEnrichedAt: { type: Date, default: null },
-    enrichAttempts: { type: Number, default: 0, min: 0 }
+    enrichAttempts: { type: Number, default: 0, min: 0 },
+    lastEnrichError: { type: String, default: '', trim: true }
   },
   { timestamps: true }
 );

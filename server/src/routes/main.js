@@ -41,6 +41,7 @@ router.get('/status', (req, res) => {
 router.post('/listings/resolve', (req, res) => listingController.resolveListing(req, res));
 router.get('/listings/popular', (req, res) => listingController.getPopular(req, res));
 router.get('/listings/:id', (req, res) => listingController.getById(req, res));
+router.post('/listings/:id/enrich', (req, res) => listingController.enrichNow(req, res));
 
 // Comments for a listing
 router.get('/listings/:id/comments', (req, res) => commentController.listByListing(req, res));

@@ -140,9 +140,9 @@ async function delay(ms) {
 }
 
 async function fetchHtmlWithRetries(url, options = {}) {
-  const backoffs = [250, 750, 1500];
+  const backoffs = [250, 750, 1500, 3000, 5000];
   let lastError = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       const response = await axios.get(url, {
         ...options,
@@ -159,15 +159,48 @@ async function fetchHtmlWithRetries(url, options = {}) {
         code === 'ECONNRESET' ||
         code === 'ETIMEDOUT';
 
-      if (!shouldRetry || attempt === 2) {
+      if (!shouldRetry || attempt === backoffs.length - 1) {
         throw err;
       }
       await delay(backoffs[attempt]);
     }
   }
-  // Should not reach here, but in case
   if (lastError) throw lastError;
   throw new Error('Unknown network error while fetching HTML');
+}
+
+function tokensFromSegment(segment) {
+  const trimmed = String(segment || '').trim();
+  if (!trimmed) return [];
+  const partsUnderscore = trimmed.split('_').map((s) => s.trim()).filter(Boolean);
+  const parts = partsUnderscore
+    .flatMap((p) => p.split('-'))
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts;
+}
+
+function capitalizeFirstWord(str) {
+  const s = String(str || '').trim();
+  if (!s) return '';
+  const firstChar = s[0].toUpperCase();
+  const rest = s.slice(1);
+  return firstChar + rest;
+}
+
+function deriveFallbackTitleFromUrl(rawUrl, avitoId) {
+  try {
+    const u = new URL(String(rawUrl || '').trim());
+    const segments = u.pathname.split('/').map((p) => p.trim()).filter(Boolean);
+    if (segments.length === 0) return '';
+    const last = segments[segments.length - 1];
+    const tokens = tokensFromSegment(last).filter((t) => String(t) !== String(avitoId));
+    if (tokens.length === 0) return '';
+    const joined = tokens.join(' ');
+    return capitalizeFirstWord(joined);
+  } catch (_) {
+    return '';
+  }
 }
 
 async function fetchAvitoDetails(url) {
@@ -185,17 +218,19 @@ async function fetchAvitoDetails(url) {
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Upgrade-Insecure-Requests': '1',
           'Referer': 'https://www.avito.ru/'
         },
         timeout: 10000,
         maxRedirects: 5
       });
     } catch (networkErr) {
-      // Offline fallback: try to resolve ID directly from URL and return minimal data
+      // Offline fallback: try to resolve ID directly from URL and return minimal data with a fallback title
       const offlineId = resolveListingIdFromUrl(rawUrl);
       if (isNonEmptyString(offlineId)) {
+        const fallbackTitle = deriveFallbackTitleFromUrl(rawUrl, offlineId);
         return {
-          title: '',
+          title: isNonEmptyString(fallbackTitle) ? fallbackTitle : '',
           avitoId: offlineId,
           mainImageUrl: '',
           canonicalUrl: rawUrl
@@ -281,6 +316,7 @@ async function fetchAvitoAccountDetails(url) {
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Upgrade-Insecure-Requests': '1',
         'Referer': 'https://www.avito.ru/'
       },
       timeout: 10000,
