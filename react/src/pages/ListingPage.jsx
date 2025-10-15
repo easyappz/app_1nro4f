@@ -57,8 +57,9 @@ function ListingPage() {
 
   const { mutate: sendComment, isPending: isSending } = useMutation({
     mutationFn: (payload) => createComment(id, payload),
-    onSuccess: () => {
-      message.success('Комментарий отправлен');
+    onSuccess: (created) => {
+      const author = created?.authorName ? ` как «${created.authorName}»` : '';
+      message.success(`Комментарий отправлен${author}`);
       form.resetFields();
       queryClient.invalidateQueries({ queryKey: ['comments', id] });
       queryClient.invalidateQueries({ queryKey: ['comments-popular', id, popularLimit] });
@@ -210,7 +211,7 @@ function ListingPage() {
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Text type="secondary" style={{ marginBottom: 8, display: 'block' }}>
-            Ваше имя создаётся автоматически
+            Ваше имя создаётся автоматически на сервере и отобразится после отправки
           </Text>
           <Form.Item
             label="Комментарий"
