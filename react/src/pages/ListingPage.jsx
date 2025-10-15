@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Avatar, Button, Card, Empty, Form, Input, List, Result, Space, Spin, Tag, Typography, message } from 'antd';
-import { EyeOutlined, LinkOutlined, PictureOutlined, HeartOutlined } from '@ant-design/icons';
+import { Avatar, Button, Card, Empty, Form, Input, List, Result, Space, Spin, Tag, Typography, message, Alert, Skeleton } from 'antd';
+import { EyeOutlined, LinkOutlined, PictureOutlined, HeartOutlined, ReloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { getListingById } from '../api/listings';
@@ -16,12 +16,21 @@ function ListingPage() {
   const [form] = Form.useForm();
   const popularLimit = 2;
 
+  // Backoff state refs for gentle auto-refresh while listing is in minimal state
+  const attemptsRef = useRef(0);
+  const totalMsRef = useRef(0);
+  const timerRef = useRef(null);
+  const MAX_TOTAL_MS = 180000; // up to ~3 minutes
+  const BASE_DELAY = 2000; // 2s
+  const MAX_DELAY = 30000; // 30s
+
   const {
     data: listing,
     isLoading: isListingLoading,
     isError: isListingError,
     error: listingError,
     refetch: refetchListing,
+    isRefetching: isListingRefetching,
   } = useQuery({
     queryKey: ['listing', id],
     queryFn: () => getListingById(id),
@@ -105,11 +114,67 @@ function ListingPage() {
     }
     return (
       <div className="media-16x9">
-        <div className="image-placeholder">
+        <div className="image-placeholder" aria-label="Изображение временно недоступно">
           <PictureOutlined />
         </div>
       </div>
     );
+  };
+
+  // Minimal listing state: created by offline fallback (avitoId present, but title and mainImageUrl are empty)
+  const isMinimal = Boolean(listing && !listing.title && !listing.mainImageUrl);
+
+  // Reset polling when id changes
+  useEffect(() => {
+    attemptsRef.current = 0;
+    totalMsRef.current = 0;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [id]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Gentle auto-refresh with exponential backoff while listing is minimal
+  useEffect(() => {
+    if (!listing) return;
+
+    const canPoll = isMinimal && totalMsRef.current < MAX_TOTAL_MS;
+    if (canPoll && !timerRef.current) {
+      const attempt = attemptsRef.current;
+      const delay = Math.min(BASE_DELAY * Math.pow(2, attempt), MAX_DELAY);
+      timerRef.current = setTimeout(async () => {
+        timerRef.current = null;
+        try {
+          await refetchListing();
+        } finally {
+          attemptsRef.current = attemptsRef.current + 1;
+          totalMsRef.current = totalMsRef.current + delay;
+        }
+      }, delay);
+    }
+
+    if ((!isMinimal || totalMsRef.current >= MAX_TOTAL_MS) && timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [listing, isMinimal, refetchListing]);
+
+  const handleManualRefresh = async () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    await refetchListing();
   };
 
   if (isListingLoading) {
@@ -137,11 +202,40 @@ function ListingPage() {
   const views = listing?.viewsCount ?? 0;
   const avitoId = listing?.avitoId;
 
+  const helmetTitle = isMinimal ? 'Авиатор — Объявление (данные загружаются)' : `Авиатор — ${titleText}`;
+  const helmetDesc = isMinimal
+    ? 'Данные объявления подтягиваются с Avito. Заголовок и фото появятся автоматически, как только будут доступны.'
+    : `Комментарии к объявлению: ${titleText}`;
+
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>
       <Helmet>
-        <title>Авиатор — {titleText}</title>
+        <title>{helmetTitle}</title>
+        <meta name="description" content={helmetDesc} />
       </Helmet>
+
+      {isMinimal && (
+        <Alert
+          className="enrich-alert card-shadow"
+          type="info"
+          showIcon
+          icon={<InfoCircleOutlined />}
+          message="Данные объявления подтягиваются с Avito"
+          description={
+            <div>
+              <div>Сейчас недоступны заголовок и главное фото. Мы автоматически обновляем данные в фоне.</div>
+              <div style={{ marginTop: 4, color: 'rgba(0,0,0,0.45)' }}>
+                Обновление выполняется с паузами 2–30 секунд до 3 минут или до появления данных.
+              </div>
+            </div>
+          }
+          action={
+            <Button type="primary" icon={<ReloadOutlined />} onClick={handleManualRefresh} loading={isListingRefetching}>
+              Обновить данные
+            </Button>
+          }
+        />
+      )}
 
       <Card className="hero-card">
         {renderHero()}
@@ -149,7 +243,14 @@ function ListingPage() {
 
       <Card className="card-shadow">
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Title level={2} style={{ margin: 0 }}>{titleText}</Title>
+          {isMinimal ? (
+            <div>
+              <Skeleton.Input active style={{ width: 320, height: 28 }} />
+            </div>
+          ) : (
+            <Title level={2} style={{ margin: 0 }}>{titleText}</Title>
+          )}
+
           <Space align="center" size={12} wrap>
             <Tag color="blue"><EyeOutlined /> <span style={{ marginLeft: 6 }}>Просмотры: {views}</span></Tag>
             {avitoId ? <Tag color="green">ID Avito: {avitoId}</Tag> : null}
@@ -161,6 +262,12 @@ function ListingPage() {
       </Card>
 
       <Card title="Комментарии" className="card-shadow">
+        {isMinimal && (
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+            Название и фото могут появиться чуть позже — вы можете оставить комментарий уже сейчас.
+          </Text>
+        )}
+
         {isCommentsLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
             <Spin />

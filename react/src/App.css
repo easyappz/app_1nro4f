@@ -201,3 +201,6 @@
               radial-gradient(800px 320px at 90% 0%, rgba(0,180,216,0.15), transparent 60%);
 }
 .cta-card { text-align: center; padding: 28px; }
+
+/* Enrichment alert tweaks */
+.enrich-alert { border-radius: var(--radius); }
