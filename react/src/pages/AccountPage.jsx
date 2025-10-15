@@ -100,7 +100,7 @@ function AccountPage() {
     if (coverUrl) {
       return (
         <div className="media-16x9">
-          <img className="media-img" src={coverUrl} alt={account?.name || 'Профиль Avito'} />
+          <img className="media-img" src={coverUrl} alt={account?.displayName || 'Профиль Avito'} />
         </div>
       );
     }
@@ -138,9 +138,9 @@ function AccountPage() {
     );
   }
 
-  const titleText = account?.name || 'Профиль продавца';
+  const titleText = account?.displayName || 'Профиль продавца';
   const views = account?.viewsCount ?? 0;
-  const userId = account?.userId;
+  const userId = account?.avitoUserId;
 
   return (
     <Space direction="vertical" size={24} style={{ width: '100%' }}>

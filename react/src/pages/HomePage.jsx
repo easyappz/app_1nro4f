@@ -18,6 +18,8 @@ function HomePage() {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [resolveType, setResolveType] = useState('listing'); // 'listing' | 'account'
+  const [messageApi, contextHolder] = message.useMessage();
+  const MSG_KEY = 'resolve-status';
   const limit = 12;
 
   const {
@@ -43,26 +45,60 @@ function HomePage() {
     },
     onSuccess: (entity) => {
       if (entity && entity._id) {
+        messageApi.open({ key: MSG_KEY, type: 'success', content: 'Найдено! Открываем…', duration: 1.2 });
         if (resolveType === 'account') {
-          message.success('Профиль найден! Открываю...');
           navigate(`/account/${entity._id}`);
         } else {
-          message.success('Объявление найдено! Открываю...');
           navigate(`/listing/${entity._id}`);
         }
       } else {
-        message.warning('Сервер вернул неожиданный ответ.');
+        messageApi.open({ key: MSG_KEY, type: 'warning', content: 'Сервер вернул неожиданный ответ.', duration: 2.5 });
       }
     },
     onError: (err) => {
-      const msg = err?.response?.data?.error?.message || 'Не удалось обработать ссылку. Попробуйте ещё раз.';
-      message.error(msg);
+      const status = err?.response?.status;
+      const details = err?.response?.data?.error?.details;
+      if (resolveType === 'account') {
+        if (status === 422) {
+          const tip = details ? ` Подсказка: ${details}` : '';
+          messageApi.open({ key: MSG_KEY, type: 'error', content: `Не удалось определить профиль по ссылке. Проверьте ссылку на профиль продавца.${tip}`, duration: 4 });
+          return;
+        }
+        if (status === 400) {
+          const tip = details ? ` Подсказка: ${details}` : '';
+          messageApi.open({ key: MSG_KEY, type: 'error', content: `Некорректный URL. Убедитесь, что вставили полную ссылку на профиль.${tip}`, duration: 4 });
+          return;
+        }
+      } else {
+        if (status === 422) {
+          const tip = details ? ` Подсказка: ${details}` : '';
+          messageApi.open({ key: MSG_KEY, type: 'error', content: `Не удалось определить объявление по ссылке. Проверьте ссылку на объявление.${tip}`, duration: 4 });
+          return;
+        }
+        if (status === 400) {
+          const tip = details ? ` Подсказка: ${details}` : '';
+          messageApi.open({ key: MSG_KEY, type: 'error', content: `Некорректный URL. Убедитесь, что вставили полную ссылку на объявление.${tip}`, duration: 4 });
+          return;
+        }
+      }
+      const fallback = err?.response?.data?.error?.message || 'Не удалось обработать ссылку. Попробуйте ещё раз.';
+      messageApi.open({ key: MSG_KEY, type: 'error', content: fallback, duration: 4 });
     },
   });
 
   const onFinish = (values) => {
-    if (isResolving) return;
-    doResolve(values);
+    if (isResolving) return; // prevent double submit
+    const url = typeof values?.url === 'string' ? values.url.trim() : '';
+
+    // Friendly pending status
+    messageApi.open({
+      key: MSG_KEY,
+      type: 'loading',
+      content: resolveType === 'account' ? 'Определяем профиль…' : 'Определяем объявление…',
+      duration: 0,
+    });
+
+    doResolve({ url });
   };
 
   const handleCardClick = (id) => {
@@ -73,6 +109,7 @@ function HomePage() {
 
   return (
     <div style={{ width: '100%' }}>
+      {contextHolder}
       <Helmet>
         <title>Авиатор — комментарии к объявлениям и профилям Avito</title>
         <meta name="description" content="Вставьте ссылку на объявление или профиль Avito, читайте и оставляйте комментарии. Популярные объявления — ниже." />
