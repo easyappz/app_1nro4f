@@ -9,7 +9,10 @@ const ListingSchema = new mongoose.Schema(
     avitoId: { type: String, index: true, unique: true, sparse: true, trim: true },
     mainImageUrl: { type: String, default: '', trim: true },
     title: { type: String, default: '', trim: true },
-    viewsCount: { type: Number, default: 0, min: 0 }
+    viewsCount: { type: Number, default: 0, min: 0 },
+    // Lazy enrichment service fields
+    lastEnrichedAt: { type: Date, default: null },
+    enrichAttempts: { type: Number, default: 0, min: 0 }
   },
   { timestamps: true }
 );

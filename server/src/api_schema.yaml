@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Listings, Accounts and Comments API
-  version: 1.5.1
+  version: 1.5.2
   description: API for resolving Avito listings and accounts, deduplicating by IDs, tracking popularity, and managing comments with likes.
 servers:
   - url: /api
@@ -56,6 +56,10 @@ paths:
         and, if the page remains unavailable, uses an offline fallback to extract avitoId directly from the URL without any network calls.
         When a valid ID is present in the URL, the service can still return 200/201 even if the page cannot be fetched.
         Status codes remain unchanged (200/201/400/422/500).
+
+        Note on lazy enrichment: If the initial fetch returns minimal offline data (usually empty title and mainImageUrl),
+        the service will respond immediately with minimal data and trigger background enrichment. Within a short time,
+        subsequent GET /listings/{id} requests may return enriched fields.
       requestBody:
         required: true
         content:
@@ -149,6 +153,10 @@ paths:
   /listings/{id}:
     get:
       summary: Get listing by id and increment its viewsCount
+      description: |
+        Returns a listing document and increments its viewsCount. If the listing lacks title or mainImageUrl,
+        the service may trigger a background lazy enrichment (throttled and with limited attempts) and still return the current document immediately.
+        Clients can re-fetch after a short delay to get enriched fields.
       parameters:
         - in: path
           name: id
@@ -669,95 +677,6 @@ paths:
                 error:
                   message: Unexpected error
                   details: Stack or message
-
-  /comments/{commentId}/like:
-    post:
-      summary: Put a like on a comment
-      parameters:
-        - in: path
-          name: commentId
-          required: true
-          schema:
-            type: string
-          description: Comment ObjectId
-      responses:
-        '200':
-          description: Like added (idempotent or incremented)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: '#/components/schemas/Comment'
-        '400':
-          description: Invalid id
-          content:
-            application/json:
-              example:
-                error:
-                  message: Invalid comment id
-                  details: Bad ObjectId
-        '404':
-          description: Comment not found
-          content:
-            application/json:
-              example:
-                error:
-                  message: Comment not found
-                  details: No document with provided id
-        '500':
-          description: Server error
-          content:
-            application/json:
-              example:
-                error:
-                  message: Unexpected error
-                  details: Stack or message
-  /comments/{commentId}/unlike:
-    post:
-      summary: Remove a like from a comment (not below zero)
-      parameters:
-        - in: path
-          name: commentId
-          required: true
-          schema:
-            type: string
-          description: Comment ObjectId
-      responses:
-        '200':
-          description: Like removed (floored at 0)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: '#/components/schemas/Comment'
-        '400':
-          description: Invalid id
-          content:
-            application/json:
-              example:
-                error:
-                  message: Invalid comment id
-                  details: Bad ObjectId
-        '404':
-          description: Comment not found
-          content:
-            application/json:
-              example:
-                error:
-                  message: Comment not found
-                  details: No document with provided id
-        '500':
-          description: Server error
-          content:
-            application/json:
-              example:
-                error:
-                  message: Unexpected error
-                  details: Stack or message
 components:
   schemas:
     Listing:
@@ -781,6 +700,14 @@ components:
         viewsCount:
           type: integer
           minimum: 0
+        lastEnrichedAt:
+          type: string
+          format: date-time
+          description: Timestamp of the last background enrichment attempt
+        enrichAttempts:
+          type: integer
+          minimum: 0
+          description: Number of background enrichment attempts performed
         createdAt:
           type: string
           format: date-time

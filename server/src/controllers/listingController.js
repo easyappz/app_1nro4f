@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 const Listing = require('@src/models/Listing');
 const { fetchAvitoDetails, resolveListingIdFromUrl } = require('@src/utils/avito');
 
+const ENRICH_MIN_INTERVAL_MS = 60 * 1000; // 60 seconds
+const ENRICH_MAX_ATTEMPTS = 5;
+
 const listingController = {
   async resolveListing(req, res) {
     try {
@@ -53,6 +56,7 @@ const listingController = {
       }
 
       const normalizedUrl = (isNonEmptyString(canonicalUrl) && canonicalUrl.trim()) || rawUrl;
+      const offlineMinimal = !isNonEmptyString(title) && !isNonEmptyString(mainImageUrl);
 
       try {
         // 1) Try to find by avitoId
@@ -68,6 +72,12 @@ const listingController = {
             doc.set(updates);
             await doc.save();
           }
+
+          // Schedule enrichment only if we received offline-minimal and the stored doc still lacks data
+          if (offlineMinimal && shouldEnrichDoc(doc)) {
+            scheduleEnrichment(doc._id, 'resolveListing:existing-by-id');
+          }
+
           return res.status(200).json({ data: doc });
         }
 
@@ -83,12 +93,20 @@ const listingController = {
               url: isNonEmptyString(normalizedUrl) ? normalizedUrl : doc.url
             });
             await doc.save();
+
+            if (offlineMinimal && shouldEnrichDoc(doc)) {
+              scheduleEnrichment(doc._id, 'resolveListing:existing-by-url');
+            }
+
             return res.status(200).json({ data: doc });
           } catch (err) {
             if (err && err.code === 11000) {
               // Race: duplicate avitoId just created elsewhere
               const conflict = await Listing.findOne({ avitoId });
               if (conflict) {
+                if (offlineMinimal && shouldEnrichDoc(conflict)) {
+                  scheduleEnrichment(conflict._id, 'resolveListing:dup-after-url');
+                }
                 return res.status(200).json({ data: conflict });
               }
             }
@@ -105,12 +123,20 @@ const listingController = {
             mainImageUrl: isNonEmptyString(mainImageUrl) ? mainImageUrl : '',
             title: isNonEmptyString(title) ? title : ''
           });
+
+          if (offlineMinimal && shouldEnrichDoc(created)) {
+            scheduleEnrichment(created._id, 'resolveListing:created');
+          }
+
           return res.status(201).json({ data: created });
         } catch (err) {
           if (err && err.code === 11000) {
             // Race: someone created it by avitoId
             const docDup = await Listing.findOne({ avitoId });
             if (docDup) {
+              if (offlineMinimal && shouldEnrichDoc(docDup)) {
+                scheduleEnrichment(docDup._id, 'resolveListing:dup-after-create');
+              }
               return res.status(200).json({ data: docDup });
             }
           }
@@ -157,6 +183,12 @@ const listingController = {
         return res.status(404).json({ error: { message: 'Listing not found', details: 'No document with provided id' } });
       }
 
+      // Background lazy enrichment when data is incomplete
+      const missingCore = !isNonEmptyString(doc.title) || !isNonEmptyString(doc.mainImageUrl);
+      if (missingCore && shouldEnrichDoc(doc)) {
+        scheduleEnrichment(doc._id, 'getById');
+      }
+
       return res.status(200).json({ data: doc });
     } catch (error) {
       return res.status(500).json({ error: { message: error.message, details: error.message } });
@@ -166,6 +198,81 @@ const listingController = {
 
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
+}
+
+function shouldEnrichDoc(doc) {
+  const attempts = Number(doc.enrichAttempts || 0);
+  const last = doc.lastEnrichedAt instanceof Date ? doc.lastEnrichedAt.getTime() : 0;
+  const now = Date.now();
+  const intervalOk = last === 0 || now - last > ENRICH_MIN_INTERVAL_MS;
+  const attemptsOk = attempts < ENRICH_MAX_ATTEMPTS;
+  return intervalOk && attemptsOk;
+}
+
+function scheduleEnrichment(listingId, reason) {
+  try {
+    setTimeout(async () => {
+      try {
+        await enrichListingSafe(listingId, reason);
+      } catch (e) {
+        console.error(`[lazy-enrich] failed (id=${listingId}, reason=${reason}):`, e.message);
+      }
+    }, 0);
+  } catch (e) {
+    // Do not block response
+    console.error(`[lazy-enrich] schedule error (id=${listingId}, reason=${reason}):`, e.message);
+  }
+}
+
+async function enrichListingSafe(listingId, reason) {
+  try {
+    const doc = await Listing.findById(listingId);
+    if (!doc) return;
+
+    const targetUrl = isNonEmptyString(doc.canonicalUrl) ? doc.canonicalUrl : doc.url;
+    if (!isNonEmptyString(targetUrl)) return;
+
+    let details;
+    try {
+      details = await fetchAvitoDetails(targetUrl);
+    } catch (e) {
+      // Even on failure, record attempt timestamp to avoid hot loops
+      await Listing.findByIdAndUpdate(listingId, {
+        $set: { lastEnrichedAt: new Date() },
+        $inc: { enrichAttempts: 1 }
+      }).catch((err) => console.error('[lazy-enrich] mark failed attempt:', err.message));
+      console.warn(`[lazy-enrich] fetch failed (id=${listingId}, reason=${reason}):`, e.message);
+      return;
+    }
+
+    const updatesSet = { lastEnrichedAt: new Date() };
+    let hasFieldImprovements = false;
+
+    if (!isNonEmptyString(doc.title) && isNonEmptyString(details.title)) {
+      updatesSet.title = details.title;
+      hasFieldImprovements = true;
+    }
+    if (!isNonEmptyString(doc.mainImageUrl) && isNonEmptyString(details.mainImageUrl)) {
+      updatesSet.mainImageUrl = details.mainImageUrl;
+      hasFieldImprovements = true;
+    }
+    if (isNonEmptyString(details.canonicalUrl) && details.canonicalUrl !== doc.canonicalUrl) {
+      updatesSet.canonicalUrl = details.canonicalUrl;
+      hasFieldImprovements = true;
+    }
+
+    // Always store attempt/time; update fields only if improved
+    await Listing.findByIdAndUpdate(listingId, {
+      $set: updatesSet,
+      $inc: { enrichAttempts: 1 }
+    }).catch((err) => console.error('[lazy-enrich] failed to update listing:', err.message));
+
+    if (hasFieldImprovements) {
+      console.log(`[lazy-enrich] listing improved (id=${listingId}, reason=${reason})`);
+    }
+  } catch (error) {
+    console.error('[lazy-enrich] unexpected error:', error.message);
+  }
 }
 
 module.exports = listingController;
