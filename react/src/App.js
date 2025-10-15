@@ -10,6 +10,7 @@ import './App.css';
 import ErrorBoundary from './ErrorBoundary';
 import HomePage from './pages/HomePage.jsx';
 import ListingPage from './pages/ListingPage.jsx';
+import AccountPage from './pages/AccountPage.jsx';
 
 const { Header, Content, Footer } = Layout;
 
@@ -36,6 +37,7 @@ function App() {
                     <Routes>
                       <Route path="/" element={<HomePage />} />
                       <Route path="/listing/:id" element={<ListingPage />} />
+                      <Route path="/account/:id" element={<AccountPage />} />
                     </Routes>
                   </div>
                 </Content>

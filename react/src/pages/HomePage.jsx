@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, message } from 'antd';
+import { Form, message, Segmented, Space } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { resolveListing, getPopular } from '../api/listings';
+import { resolveAccount } from '../api/accounts';
 
 import Hero from '../components/landing/Hero';
 import Steps from '../components/landing/Steps';
@@ -16,6 +17,7 @@ import CTA from '../components/landing/CTA';
 function HomePage() {
   const navigate = useNavigate();
   const [form] = Form.useForm();
+  const [resolveType, setResolveType] = useState('listing'); // 'listing' | 'account'
   const limit = 12;
 
   const {
@@ -32,11 +34,22 @@ function HomePage() {
   const popular = useMemo(() => popularData || [], [popularData]);
 
   const { mutate: doResolve, isPending: isResolving } = useMutation({
-    mutationFn: (values) => resolveListing(values.url),
-    onSuccess: (listing) => {
-      if (listing && listing._id) {
-        message.success('Объявление найдено! Открываю...');
-        navigate(`/listing/${listing._id}`);
+    mutationFn: async (values) => {
+      const url = typeof values?.url === 'string' ? values.url.trim() : '';
+      if (resolveType === 'account') {
+        return resolveAccount(url);
+      }
+      return resolveListing(url);
+    },
+    onSuccess: (entity) => {
+      if (entity && entity._id) {
+        if (resolveType === 'account') {
+          message.success('Профиль найден! Открываю...');
+          navigate(`/account/${entity._id}`);
+        } else {
+          message.success('Объявление найдено! Открываю...');
+          navigate(`/listing/${entity._id}`);
+        }
       } else {
         message.warning('Сервер вернул неожиданный ответ.');
       }
@@ -49,8 +62,7 @@ function HomePage() {
 
   const onFinish = (values) => {
     if (isResolving) return;
-    const url = typeof values?.url === 'string' ? values.url.trim() : '';
-    doResolve({ url });
+    doResolve(values);
   };
 
   const handleCardClick = (id) => {
@@ -62,13 +74,24 @@ function HomePage() {
   return (
     <div style={{ width: '100%' }}>
       <Helmet>
-        <title>Авиатор — комментарии к объявлениям Avito</title>
-        <meta name="description" content="Вставьте ссылку на объявление Avito, читайте и оставляйте комментарии. Популярные карточки — ниже." />
-        <meta property="og:title" content="Авиатор — комментарии к объявлениям Avito" />
-        <meta property="og:description" content="Обсуждайте объявления Avito, читайте мнения и делитесь опытом. Популярные карточки — на главной." />
+        <title>Авиатор — комментарии к объявлениям и профилям Avito</title>
+        <meta name="description" content="Вставьте ссылку на объявление или профиль Avito, читайте и оставляйте комментарии. Популярные объявления — ниже." />
+        <meta property="og:title" content="Авиатор — комментарии к объявлениям и профилям Avito" />
+        <meta property="og:description" content="Обсуждайте объявления и профили Avito, читайте мнения и делитесь опытом. Популярные карточки — на главной." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={currentUrl} />
       </Helmet>
+
+      <Space direction="vertical" size={12} style={{ width: '100%', marginBottom: 12 }}>
+        <Segmented
+          options={[
+            { label: 'Объявление', value: 'listing' },
+            { label: 'Профиль продавца', value: 'account' },
+          ]}
+          value={resolveType}
+          onChange={(val) => setResolveType(val)}
+        />
+      </Space>
 
       <Hero form={form} isResolving={isResolving} onFinish={onFinish} />
       <Steps />
